@@ -1,0 +1,6 @@
+openai           
+pymupdf            
+sqlalchemy         
+pydantic           
+python-dotenv      
+json_repair       
