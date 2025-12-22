@@ -3,4 +3,6 @@ pymupdf
 sqlalchemy         
 pydantic           
 python-dotenv      
-json_repair       
+json_repair
+psycopg2-binary
+streamlit
