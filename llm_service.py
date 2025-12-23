@@ -12,7 +12,7 @@ from db_models import LLMProvider
 def get_all_providers(pool_type: str = None) -> list[dict]:
     """获取所有提供商，可按类型过滤"""
     with get_db_session() as session:
-        query = session.query(LLMProvider).order_by(LLMProvider.priority)
+        query = session.query(LLMProvider).order_by(LLMProvider.weight.desc())
         if pool_type:
             query = query.filter(LLMProvider.pool_type == pool_type)
         providers = query.all()
@@ -23,8 +23,9 @@ def get_all_providers(pool_type: str = None) -> list[dict]:
                 "base_url": p.base_url,
                 "api_key": p.api_key,
                 "pool_type": p.pool_type,
+                "api_type": getattr(p, 'api_type', 'openai'),
                 "is_primary": p.is_primary,
-                "priority": p.priority,
+                "weight": getattr(p, 'weight', 10),
                 "models": p.models,
                 "enabled": p.enabled,
                 "created_at": p.created_at,
@@ -48,15 +49,17 @@ def get_enabled_providers(pool_type: str) -> list[dict]:
                 "name": p.name,
                 "base_url": p.base_url,
                 "api_key": p.api_key,
+                "api_type": getattr(p, 'api_type', 'openai'),
                 "models": p.models,
                 "is_primary": p.is_primary,
+                "weight": getattr(p, 'weight', 10),
             }
             for p in providers
         ]
 
 
 def add_provider(name: str, base_url: str, api_key: str, pool_type: str, 
-                 models: str, is_primary: bool = False, priority: int = 100) -> int:
+                 models: str, is_primary: bool = False, weight: int = 10, api_type: str = "openai") -> int:
     """添加新的提供商"""
     with get_db_session() as session:
         # 如果设置为主模型，先取消其他主模型
@@ -70,9 +73,10 @@ def add_provider(name: str, base_url: str, api_key: str, pool_type: str,
             base_url=base_url,
             api_key=api_key,
             pool_type=pool_type,
+            api_type=api_type,
             models=models,
             is_primary=is_primary,
-            priority=priority,
+            weight=weight,
             enabled=True,
         )
         session.add(provider)
@@ -161,15 +165,19 @@ def import_from_json(json_path: str = "llm_config.json") -> int:
     for pool_type, pool_name in [("metadata", "metadata_pool"), ("analysis", "analysis_pool")]:
         entries = config.get(pool_name, [])
         for i, entry in enumerate(entries):
+            # 支持 model 和 models 两种字段名
+            models = entry.get("model", entry.get("models", ""))
             add_provider(
                 name=f"{pool_type.capitalize()} Provider {i+1}",
                 base_url=entry.get("base_url", ""),
                 api_key=entry.get("api_key", ""),
                 pool_type=pool_type,
-                models=entry.get("model", ""),
+                models=models,
                 is_primary=(i == 0),  # 第一个设为主模型
-                priority=(i + 1) * 10,  # 优先级 10, 20, 30...
+                weight=entry.get("weight", 10),  # 使用权重
+                api_type=entry.get("api_type", "openai"),  # 读取 api_type，默认 openai
             )
             count += 1
     
     return count
+

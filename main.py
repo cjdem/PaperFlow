@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from db_models import Paper, Session as DBSession
 from json_repair import repair_json
-from llm_pool import llm_manager 
+from llm_pool import llm_manager
+from log_service import workflow_logger, get_logger
+
+logger = get_logger("main")
 
 load_dotenv()
 
@@ -18,7 +21,7 @@ def normalize_title(title):
     return re.sub(r'[^a-zA-Z0-9]', '', title).lower()
 
 def extract_pdf_content(file_path):
-    print(f"\n[1/4] 正在读取 PDF: {file_path}")
+    logger.debug(f"正在读取 PDF: {file_path}")
     try:
         doc = fitz.open(file_path)
         full_text = ""
@@ -26,20 +29,20 @@ def extract_pdf_content(file_path):
             full_text += page.get_text()
         
         if len(full_text) < 100:
-            print("   ⚠️  警告: 提取内容过少，可能是扫描件！")
+            logger.warning("提取内容过少，可能是扫描件")
             return None, None
             
         head_text = full_text[:15000]
         return head_text, full_text
     except Exception as e:
-        print(f"   ❌ 读取失败: {e}")
+        logger.error(f"PDF 读取失败: {e}")
         return None, None
 
 # ================= LLM 任务 =================
 
 async def task_extract_metadata(text):
     if not text: return None
-    print("\n[2/4 - A] 请求元数据提取 (Pool: Metadata)...")
+    logger.info("请求元数据提取 (Pool: Metadata)")
     
     def validate_json(content):
         return "title" in content and len(content) > 20
@@ -78,16 +81,16 @@ async def task_extract_metadata(text):
         if isinstance(parsed_json.get('authors'), list):
             parsed_json['authors'] = ", ".join(parsed_json['authors'])
             
-        print(f"   ✅ 元数据提取成功: {parsed_json.get('title_cn')}")
+        logger.info(f"元数据提取成功: {parsed_json.get('title_cn')}")
         return parsed_json
 
     except Exception as e:
-        print(f"   ❌ Metadata 任务失败: {e}")
+        logger.error(f"Metadata 任务失败: {e}")
         raise e
 
 async def task_analyze_paper(full_text):
     if not full_text: return "无内容"
-    print("\n[2/4 - B] 请求深度分析 (Pool: Analysis)...")
+    logger.info("请求深度分析 (Pool: Analysis)")
     
     input_text = full_text
 
@@ -200,10 +203,10 @@ async def task_analyze_paper(full_text):
             temperature=0.2,
             validator=validate_analysis
         )
-        print("   ✅ 详细报告生成成功")
+        logger.info("详细报告生成成功")
         return response.choices[0].message.content
     except Exception as e:
-        print(f"   ❌ Analysis 任务失败: {e}")
+        logger.error(f"Analysis 任务失败: {e}")
         raise e
 
 # ================= 核心编排 =================
@@ -213,11 +216,12 @@ async def process_workflow(pdf_path, file_md5=None, owner_id=None):
     owner_id: 当前上传用户的 ID
     """
     # 1. 解析 PDF
+    workflow_logger.log_start(pdf_path)
     head_text, full_text = extract_pdf_content(pdf_path)
     if not head_text: raise ValueError("PDF解析为空")
 
     # 2. 提取元数据 (Metadata)
-    print("\n>>> [Step 1] 提取元数据以查重...")
+    workflow_logger.log_step(1, 4, "提取元数据以查重")
     metadata = await task_extract_metadata(head_text)
     
     if not metadata or not metadata.get('title'):
@@ -232,22 +236,23 @@ async def process_workflow(pdf_path, file_md5=None, owner_id=None):
         existing_papers = session.query(Paper.title).all()
         for (db_title,) in existing_papers:
             if normalize_title(db_title) == normalized_current:
-                print(f"   ⚠️ 语义重复: {current_title}")
+                workflow_logger.log_skip(pdf_path, f"语义重复: {current_title}")
                 raise FileExistsError(f"语义重复: {current_title}")
     finally:
         session.close()
 
-    print("   ✅ 通过查重，开始深度分析...")
+    logger.info("通过查重，开始深度分析")
     
     # 3. 深度分析 (Analysis)
+    workflow_logger.log_step(2, 4, "深度分析")
     analysis = await task_analyze_paper(full_text)
 
     # 4. 入库 (关联 Owner)
-    print("\n[3/4] 正在写入数据库...")
+    workflow_logger.log_step(3, 4, "写入数据库")
     session = DBSession()
     try:
         new_paper = Paper(
-            file_md5=file_md5,
+            md5_hash=file_md5,
             title=metadata.get('title'),
             title_cn=metadata.get('title_cn'),
             journal=metadata.get('journal'),
@@ -256,12 +261,11 @@ async def process_workflow(pdf_path, file_md5=None, owner_id=None):
             abstract_en=metadata.get('abstract_en'),
             abstract=metadata.get('abstract'),
             detailed_analysis=analysis,
-            raw_metadata=metadata,
             owner_id=owner_id  # <--- 这里关联用户
         )
         session.add(new_paper)
         session.commit()
-        print(f"🎉 处理完成！")
+        workflow_logger.log_complete(pdf_path, metadata.get('title', ''))
         
     except Exception as e:
         session.rollback()

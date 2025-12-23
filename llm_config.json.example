@@ -1,0 +1,159 @@
+{
+  "metadata_pool": [
+    {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "sk-your-openai-api-key-here",
+      "model": "gpt-4o-mini",
+      "weight": 10,
+      "api_type": "openai"
+    },
+    {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "api_key": "your-gemini-api-key-here",
+      "model": "gemini-2.0-flash-exp",
+      "weight": 8,
+      "api_type": "gemini"
+    },
+    {
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key": "sk-your-deepseek-api-key-here",
+      "model": "deepseek-chat",
+      "weight": 5,
+      "api_type": "openai"
+    }
+  ],
+  "analysis_pool": [
+    {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "sk-your-openai-api-key-here",
+      "model": "gpt-4o",
+      "weight": 10,
+      "api_type": "openai"
+    },
+    {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "api_key": "your-gemini-api-key-here",
+      "model": "gemini-2.0-flash-thinking-exp",
+      "weight": 9,
+      "api_type": "gemini"
+    },
+    {
+      "base_url": "https://api.anthropic.com",
+      "api_key": "sk-ant-your-claude-api-key-here",
+      "model": "claude-3-5-sonnet-20241022",
+      "weight": 8,
+      "api_type": "anthropic"
+    }
+  ],
+  "_comments": {
+    "说明": "此文件仅在首次运行时使用，之后请在管理员面板的 '🤖 LLM 配置' 中管理",
+    "metadata_pool": "用于提取论文元数据（标题、作者、期刊等）的模型池",
+    "analysis_pool": "用于生成摘要和深度分析的模型池",
+    "字段说明": {
+      "base_url": "API 端点地址",
+      "api_key": "API 密钥，支持逗号分隔多个密钥实现负载均衡",
+      "model": "模型名称，支持逗号分隔多个模型",
+      "weight": "权重值（1-100），数值越大被选中概率越高",
+      "api_type": "API 类型，可选值: 'openai', 'gemini' 或 'anthropic'"
+    },
+    "api_type_区别": {
+      "openai": {
+        "适用于": "OpenAI、DeepSeek、Anthropic Claude、Qwen、GLM 等兼容 OpenAI SDK 的 API",
+        "base_url_示例": [
+          "https://api.openai.com/v1",
+          "https://api.deepseek.com/v1",
+          "https://api.anthropic.com/v1",
+          "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          "https://open.bigmodel.cn/api/paas/v4"
+        ],
+        "认证方式": "通过 Authorization: Bearer {api_key} 请求头"
+      },
+      "gemini": {
+        "适用于": "Google Gemini API（官方或中转服务）",
+        "base_url_示例": [
+          "https://generativelanguage.googleapis.com/v1beta",
+          "https://your-gemini-proxy.com/v1beta"
+        ],
+        "认证方式": "通过 URL 参数 ?key={api_key}",
+        "模型名称示例": [
+          "gemini-2.0-flash-exp",
+          "gemini-2.0-flash-thinking-exp",
+          "gemini-1.5-pro",
+          "gemini-1.5-flash"
+        ]
+      },
+      "anthropic": {
+        "适用于": "Anthropic Claude API（官方或中转服务）",
+        "base_url_示例": [
+          "https://api.anthropic.com",
+          "https://your-claude-proxy.com"
+        ],
+        "认证方式": "通过 x-api-key 请求头",
+        "模型名称示例": [
+          "claude-3-5-sonnet-20241022",
+          "claude-3-opus-20240229",
+          "claude-3-haiku-20240307"
+        ]
+      }
+    },
+    "多密钥负载均衡示例": {
+      "api_key": "sk-key1,sk-key2,sk-key3",
+      "说明": "系统会为每个密钥创建独立通道，按权重随机选择"
+    },
+    "多模型配置示例": {
+      "model": "gpt-4o,gpt-4o-mini,gpt-3.5-turbo",
+      "说明": "系统会为每个模型创建独立通道"
+    },
+    "权重说明": {
+      "weight_10": "高优先级，适合主力模型",
+      "weight_5": "中等优先级，适合备用模型",
+      "weight_1": "低优先级，仅在其他模型失败时使用"
+    },
+    "常见配置示例": {
+      "OpenAI官方": {
+        "base_url": "https://api.openai.com/v1",
+        "api_key": "sk-...",
+        "model": "gpt-4o-mini",
+        "api_type": "openai"
+      },
+      "Gemini官方": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "api_key": "AIza...",
+        "model": "gemini-2.0-flash-exp",
+        "api_type": "gemini"
+      },
+      "DeepSeek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "sk-...",
+        "model": "deepseek-chat",
+        "api_type": "openai"
+      },
+      "阿里通义千问": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "api_key": "sk-...",
+        "model": "qwen-plus",
+        "api_type": "openai"
+      },
+      "智谱GLM": {
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": "...",
+        "model": "glm-4-flash",
+        "api_type": "openai"
+      },
+      "Claude (原生格式)": {
+        "base_url": "https://api.anthropic.com",
+        "api_key": "sk-ant-...",
+        "model": "claude-3-5-sonnet-20241022",
+        "api_type": "anthropic",
+        "说明": "使用 Anthropic 原生 API 格式，推荐"
+      },
+      "Claude (OpenAI兼容)": {
+        "base_url": "https://your-claude-openai-proxy.com/v1",
+        "api_key": "...",
+        "model": "claude-3-5-sonnet-20241022",
+        "api_type": "openai",
+        "说明": "通过 OpenAI 兼容层调用 Claude"
+      }
+    }
+  }
+}

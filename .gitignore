@@ -1,4 +1,4 @@
-# Python
+# ==================== Python ====================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,46 +16,126 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual Environment
+# ==================== Virtual Environment ====================
 .venv/
 venv/
 ENV/
 env/
+env.bak/
+venv.bak/
 
-# Database
+# ==================== Database ====================
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
 papers.db
+papers.db-shm
+papers.db-wal
 
-# Environment Variables & Secrets
+# ==================== Environment Variables & Secrets ====================
 .env
-.env.local
+.env.*
+!.env.example
 llm_config.json
+secrets.toml
+*.key
+*.pem
+*.cert
 
-# Temporary Files
+# ==================== Temporary Files ====================
 temp/
+tmp/
 *.pdf
 *.tmp
-
-# Streamlit
-.streamlit/secrets.toml
-.streamlit/config.toml
-
-# IDE
-.vscode/
-.idea/
+*.bak
+*.backup
+*~.nib
 *.swp
 *.swo
+
+# ==================== Streamlit ====================
+.streamlit/secrets.toml
+.streamlit/config.toml
+.streamlit/credentials.toml
+
+# ==================== IDE & Editors ====================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
 *~
 .DS_Store
+*.code-workspace
 
-# Logs
+# ==================== Testing ====================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+nosetests.xml
+
+# ==================== Type Checking ====================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# ==================== Logs ====================
 *.log
+logs/
+*.log.*
+paperflow.log*
 
-# OS
+# ==================== OS ====================
 Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ==================== Deployment ====================
+.vercel
+.netlify
+.railway
+.render
+.fly
+*.pid
+*.seed
+*.pid.lock
+
+# ==================== Jupyter Notebook ====================
+.ipynb_checkpoints
+*.ipynb
+
+# ==================== Package Manager ====================
+poetry.lock
+Pipfile.lock
+pdm.lock
+.pdm.toml
+
+# ==================== Documentation ====================
+docs/_build/
+site/
+
+# ==================== Backup & Archives ====================
+*.zip
+*.tar.gz
+*.rar
+*.7z

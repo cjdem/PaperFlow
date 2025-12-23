@@ -31,7 +31,15 @@ pip install -r requirements.txt
 
 ### 3. 配置环境变量
 
-创建 `.env` 文件：
+复制 `.env.example` 为 `.env` 并修改配置：
+
+```bash
+cp .env.example .env
+# Windows (PowerShell):
+# copy .env.example .env
+```
+
+或者手动创建：
 
 ```bash
 DB_URL=sqlite:///papers.db
@@ -39,7 +47,15 @@ DB_URL=sqlite:///papers.db
 
 ### 4. 配置 LLM 提供商（首次运行可选）
 
-创建 `llm_config.json`（首次启动会自动导入到数据库）：
+复制 `llm_config.json.example` 为 `llm_config.json` 并填入 API Key（首次启动会自动导入到数据库）：
+
+```bash
+cp llm_config.json.example llm_config.json
+# Windows (PowerShell):
+# copy llm_config.json.example llm_config.json
+```
+
+或者手动创建：
 
 ```json
 {
@@ -47,14 +63,18 @@ DB_URL=sqlite:///papers.db
     {
       "base_url": "https://api.openai.com/v1",
       "api_key": "your-api-key",
-      "model": "gpt-4"
+      "model": "gpt-4",
+      "weight": 10,
+      "api_type": "openai"
     }
   ],
   "analysis_pool": [
     {
       "base_url": "https://api.openai.com/v1",
       "api_key": "your-api-key",
-      "model": "gpt-4"
+      "model": "gpt-4",
+      "weight": 10,
+      "api_type": "openai"
     }
   ]
 }
@@ -84,10 +104,12 @@ PaperFlow/
 ├── auth_service.py        # 认证服务
 ├── llm_pool.py            # LLM 池管理
 ├── llm_service.py         # LLM CRUD 操作
+├── log_service.py         # 日志服务
 ├── ui_components.py       # UI 组件
 ├── styles.py              # 主题样式
 ├── utils.py               # 工具函数
 ├── main.py                # 论文处理流程
+├── llm_config.json.example # LLM 配置文件模版
 └── requirements.txt       # 依赖列表
 ```
 
@@ -106,6 +128,10 @@ PaperFlow/
 - **调整优先级**：数字越小优先级越高
 - **启用/禁用**：灵活控制提供商状态
 - **编辑配置**：支持多行 API 密钥输入
+
+### 系统设置
+- **日志开关**：可开启或关闭日志记录功能
+- **LLM 重试次数**：配置 LLM 调用失败后的最大重试次数
 
 ## 🌐 部署
 

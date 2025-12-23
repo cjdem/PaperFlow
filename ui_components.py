@@ -11,7 +11,7 @@ from styles import toggle_theme
 from utils import calculate_md5, clean_markdown_math
 from db_service import (
     get_all_groups_list, get_papers, create_group,
-    update_paper_groups, is_md5_exist, get_db_stats, get_all_users
+    update_paper_groups, is_md5_exist, get_db_stats, get_all_users, delete_paper
 )
 from auth_service import verify_user, register_user
 from main import process_workflow
@@ -130,39 +130,78 @@ def render_sidebar(user_info: dict) -> tuple[str, list[str]]:
             with st.expander("📤 上传新论文", expanded=True):
                 files = st.file_uploader("拖拽PDF到此处", type="pdf", accept_multiple_files=True, label_visibility="collapsed")
                 if files:
-                    if st.button(f"处理 {len(files)} 个文件", type="primary", use_container_width=True):
-                        handle_file_upload(files, user_info['id'])
+                    # 使用 disabled 参数在处理时禁用按钮
+                    is_processing = st.session_state.get("is_processing", False)
+                    if st.button(f"处理 {len(files)} 个文件", type="primary", use_container_width=True, disabled=is_processing):
+                        st.session_state.is_processing = True
+                        with st.spinner(f"正在并行处理 {len(files)} 篇论文..."):
+                            handle_file_upload(files, user_info['id'])
 
         return current_view, all_groups
 
 
 # ================= 文件上传处理 =================
+async def _process_single_file(f, owner_id: int, temp_dir: str) -> tuple[str, bool, str]:
+    """处理单个文件，返回 (文件名, 是否成功, 消息)"""
+    import os
+    from utils import calculate_md5
+    from main import process_workflow
+    
+    f.seek(0)
+    md5 = calculate_md5(f.read())
+    f.seek(0)
+    
+    if is_md5_exist(md5):
+        return (f.name, False, "已存在")
+    
+    tpath = os.path.join(temp_dir, f.name)
+    try:
+        with open(tpath, "wb") as tmp:
+            tmp.write(f.read())
+        
+        await process_workflow(tpath, md5, owner_id)
+        return (f.name, True, "完成")
+    except Exception as e:
+        return (f.name, False, str(e)[:50])
+    finally:
+        if os.path.exists(tpath):
+            os.remove(tpath)
+
+
 def handle_file_upload(uploaded_files, owner_id: int):
-    """处理文件上传"""
-    prog = st.progress(0)
+    """并行处理文件上传"""
+    import asyncio
+    
+    prog = st.progress(0, text="准备处理...")
     if not os.path.exists("temp"):
         os.makedirs("temp", exist_ok=True)
-
+    
+    async def run_all():
+        tasks = [_process_single_file(f, owner_id, "temp") for f in uploaded_files]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+    
     try:
-        for i, f in enumerate(uploaded_files):
-            f.seek(0)
-            md5 = calculate_md5(f.read())
-            f.seek(0)
-
-            if is_md5_exist(md5):
-                st.toast(f"已存在: {f.name}")
+        prog.progress(0.1, text=f"并行处理 {len(uploaded_files)} 个文件...")
+        results = asyncio.run(run_all())
+        
+        # 显示结果
+        success_count = 0
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                st.toast(f"❌ 处理失败: {uploaded_files[i].name}")
             else:
-                tpath = f"temp/{f.name}"
-                with open(tpath, "wb") as tmp:
-                    tmp.write(f.read())
-
-                asyncio.run(process_workflow(tpath, md5, owner_id))
-
-                if os.path.exists(tpath):
-                    os.remove(tpath)
-                st.toast(f"✅ 完成: {f.name}")
+                fname, success, msg = result
+                if success:
+                    st.toast(f"✅ {fname}: {msg}")
+                    success_count += 1
+                else:
+                    st.toast(f"⚠️ {fname}: {msg}")
             prog.progress((i + 1) / len(uploaded_files))
+        
+        st.success(f"处理完成: {success_count}/{len(uploaded_files)} 篇论文成功")
     finally:
+        # 重置处理状态
+        st.session_state.is_processing = False
         time.sleep(1)
         st.rerun()
 
@@ -175,11 +214,12 @@ def render_admin_panel():
         delete_provider, set_primary, toggle_enabled
     )
     from llm_pool import llm_manager
+    from db_service import get_config, set_config
     
     st.title("🔧 系统管理控制台")
     
     # 创建标签页
-    tab1, tab2 = st.tabs(["📊 系统概览", "🤖 LLM 配置"])
+    tab1, tab2, tab3 = st.tabs(["📊 系统概览", "🤖 LLM 配置", "⚙️ 系统设置"])
     
     # ========== Tab 1: 系统概览 ==========
     with tab1:
@@ -211,18 +251,63 @@ def render_admin_panel():
         
         with col_add:
             with st.popover("➕ 添加提供商", use_container_width=True):
+                # API 示例配置
+                API_EXAMPLES = {
+                    "openai": {
+                        "url": "https://api.openai.com/v1",
+                        "models": "gpt-4o, gpt-4o-mini, gpt-3.5-turbo",
+                        "endpoint": "/chat/completions",
+                        "providers": "OpenAI, DeepSeek, 通义千问, 智谱GLM, Cerebras"
+                    },
+                    "gemini": {
+                        "url": "https://generativelanguage.googleapis.com/v1beta",
+                        "models": "gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash",
+                        "endpoint": "/models/{model}:generateContent",
+                        "providers": "Google Gemini"
+                    },
+                    "anthropic": {
+                        "url": "https://api.anthropic.com",
+                        "models": "claude-3-5-sonnet-20241022, claude-3-opus-20240229",
+                        "endpoint": "/v1/messages",
+                        "providers": "Anthropic Claude"
+                    }
+                }
+                
                 with st.form("add_provider_form"):
                     new_name = st.text_input("名称", placeholder="例如: OpenAI 主力")
-                    new_url = st.text_input("API 地址", placeholder="https://api.openai.com/v1")
+                    new_api_type = st.selectbox(
+                        "API 类型", 
+                        ["openai", "gemini", "anthropic"], 
+                        help="选择 API 格式：openai (兼容大多数模型), gemini (Google), anthropic (Claude)"
+                    )
+                    
+                    # 显示当前类型的示例
+                    example = API_EXAMPLES.get(new_api_type, API_EXAMPLES["openai"])
+                    st.caption(f"💡 适用于: {example['providers']}")
+                    
+                    new_url = st.text_input(
+                        "API 地址", 
+                        placeholder=example["url"],
+                        help=f"示例: {example['url']}"
+                    )
+                    if new_url:
+                        st.caption(f"🔗 端点预览: {new_url}{example['endpoint']}")
+                    else:
+                        st.caption(f"🔗 端点预览: {example['url']}{example['endpoint']}")
+                    
                     new_key = st.text_input("API 密钥", type="password")
                     new_pool = st.selectbox("池类型", ["metadata", "analysis"])
-                    new_models = st.text_input("模型列表", placeholder="gpt-4,gpt-3.5-turbo")
+                    new_models = st.text_input(
+                        "模型列表", 
+                        placeholder=example["models"],
+                        help=f"示例: {example['models']}"
+                    )
                     new_primary = st.checkbox("设为主模型")
-                    new_priority = st.number_input("优先级", min_value=1, max_value=999, value=100)
+                    new_weight = st.number_input("权重", min_value=1, max_value=100, value=10, help="权重越高被调用概率越大")
                     
                     if st.form_submit_button("添加", type="primary", use_container_width=True):
-                        if new_name and new_url and new_key and new_models:
-                            add_provider(new_name, new_url, new_key, new_pool, new_models, new_primary, new_priority)
+                        if new_name and new_key and new_models:
+                            add_provider(new_name, new_url, new_key, new_pool, new_models, new_primary, new_weight, new_api_type)
                             llm_manager.reload_config()
                             st.success("添加成功！")
                             st.rerun()
@@ -244,7 +329,9 @@ def render_admin_panel():
                 # 使用 expander 展开详情
                 primary_badge = "⭐ " if p["is_primary"] else ""
                 status_icon = "✅" if p["enabled"] else "⏸️"
-                expander_title = f"{status_icon} {primary_badge}{p['name']} (优先级: {p['priority']})"
+                weight_info = p.get('weight', 10)
+                api_type_badge = f"[{p.get('api_type', 'openai')}]"
+                expander_title = f"{status_icon} {primary_badge}{p['name']} {api_type_badge} (权重: {weight_info})"
                 
                 with st.expander(expander_title, expanded=False):
                     # 操作按钮行 - 3列等宽
@@ -294,7 +381,16 @@ def render_admin_panel():
                             value=p["base_url"],
                             label_visibility="collapsed"
                         )
-                        st.caption(f"预览: {p['base_url']}/chat/completions")
+                        # 根据 api_type 显示正确的端点预览
+                        api_type = p.get('api_type', 'openai')
+                        if api_type == "gemini":
+                            endpoint_preview = "/models/{model}:generateContent"
+                        elif api_type == "anthropic":
+                            endpoint_preview = "/v1/messages"
+                        else:
+                            endpoint_preview = "/chat/completions"
+                        preview_url = edit_url if edit_url else p["base_url"]
+                        st.caption(f"🔗 端点预览: {preview_url}{endpoint_preview}")
                         
                         # 模型列表
                         st.markdown("**模型列表**")
@@ -306,24 +402,25 @@ def render_admin_panel():
                         )
                         st.caption("多个模型用逗号分隔，按顺序尝试")
                         
-                        # 优先级和名称
-                        col_pri, col_name = st.columns(2)
-                        with col_pri:
-                            st.markdown("**优先级**")
-                            edit_priority = st.number_input(
-                                "优先级", 
-                                min_value=1, 
-                                max_value=999, 
-                                value=p["priority"],
-                                label_visibility="collapsed",
-                                help="数字越小优先级越高"
-                            )
+                        # 名称和权重
+                        col_name, col_weight = st.columns(2)
                         with col_name:
                             st.markdown("**名称**")
                             edit_name = st.text_input(
                                 "名称", 
                                 value=p["name"],
                                 label_visibility="collapsed"
+                            )
+                        with col_weight:
+                            st.markdown("**权重**")
+                            edit_weight = st.number_input(
+                                "权重",
+                                min_value=1,
+                                max_value=100,
+                                value=p.get("weight", 10),
+                                label_visibility="collapsed",
+                                help="权重越高被调用概率越大",
+                                key=f"weight_{p['id']}"
                             )
                         
                         # 保存按钮
@@ -336,11 +433,64 @@ def render_admin_panel():
                                 base_url=edit_url,
                                 api_key=api_key_cleaned,
                                 models=edit_models, 
-                                priority=edit_priority
+                                weight=edit_weight
                             )
                             llm_manager.reload_config()
                             st.success("✅ 保存成功！")
                             st.rerun()
+    
+    # ========== Tab 3: 系统设置 ==========
+    with tab3:
+        from log_service import is_logging_enabled, set_logging_enabled
+        
+        st.subheader("📝 日志设置")
+        
+        # 从数据库读取日志开关状态，默认为开启
+        log_enabled_str = get_config("log_enabled", "true")
+        log_enabled = log_enabled_str.lower() == "true"
+        
+        # 同步内存状态
+        if is_logging_enabled() != log_enabled:
+            set_logging_enabled(log_enabled)
+        
+        new_log_enabled = st.toggle(
+            "启用日志记录",
+            value=log_enabled,
+            help="关闭后将不再记录日志到文件和控制台"
+        )
+        
+        if new_log_enabled != log_enabled:
+            set_config("log_enabled", "true" if new_log_enabled else "false")
+            set_logging_enabled(new_log_enabled)
+            status = "✅ 日志已启用" if new_log_enabled else "⏸️ 日志已禁用"
+            st.success(status)
+            st.rerun()
+        
+        if log_enabled:
+            st.caption("📁 日志文件位置: `logs/paperflow.log`")
+        else:
+            st.caption("⚠️ 日志功能已关闭，将不会记录任何操作日志")
+        
+        st.markdown("---")
+        
+        st.subheader("⚙️ LLM 调用设置")
+        
+        current_retries = int(get_config("llm_max_retries", "3"))
+        
+        with st.form("system_config_form"):
+            new_retries = st.number_input(
+                "LLM 最大重试次数",
+                min_value=1,
+                max_value=10,
+                value=current_retries,
+                help="调用失败后最多重试几次（每次会排除刚失败的通道）"
+            )
+            st.caption("建议设置为 3-5 次，确保高可用性")
+            
+            if st.form_submit_button("💾 保存设置", type="primary", use_container_width=True):
+                set_config("llm_max_retries", str(new_retries))
+                st.success(f"✅ 已保存！最大重试次数: {new_retries}")
+                st.rerun()
 
 
 # ================= 论文列表 =================
@@ -382,7 +532,7 @@ def render_paper_list(current_view: str, all_group_options: list[str], user_info
         """, unsafe_allow_html=True
         )
 
-        c_tag, c_detail = st.columns([3, 1])
+        c_tag, c_del = st.columns([4, 1])
         with c_tag:
             current_tags = [g.name for g in paper.groups]
             st.multiselect(
@@ -390,6 +540,13 @@ def render_paper_list(current_view: str, all_group_options: list[str], user_info
                 key=f"g_{paper.id}", label_visibility="collapsed", placeholder="➕ 添加标签...",
                 on_change=lambda pid=paper.id: update_paper_groups(pid, st.session_state[f"g_{pid}"])
             )
+        with c_del:
+            if st.button("🗑️ 删除", key=f"del_paper_{paper.id}", use_container_width=True):
+                if delete_paper(paper.id):
+                    st.toast(f"✅ 已删除: {paper.title[:30]}...")
+                    st.rerun()
+                else:
+                    st.toast("❌ 删除失败")
 
         with st.expander("📖 阅读报告", expanded=False):
             t1, t2, t3 = st.tabs(["💡 深度分析", "📄 原始摘要", "🇨🇳 中文摘要"])

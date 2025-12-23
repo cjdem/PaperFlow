@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, joinedload
 import streamlit as st
 
-from db_models import Paper, Group, User
+from db_models import Paper, Group, User, SystemConfig
 
 # ================= 数据库连接 =================
 DB_URL = os.getenv("DB_URL", "sqlite:///papers.db")
@@ -110,7 +110,20 @@ def is_md5_exist(md5_val: str) -> bool:
     """检查MD5是否已存在"""
     try:
         with get_db_session() as session:
-            return session.query(Paper.id).filter_by(file_md5=md5_val).first() is not None
+            return session.query(Paper.id).filter_by(md5_hash=md5_val).first() is not None
+    except Exception:
+        return False
+
+
+def delete_paper(paper_id: int) -> bool:
+    """删除指定论文"""
+    try:
+        with get_db_session() as session:
+            paper = session.query(Paper).filter_by(id=paper_id).first()
+            if paper:
+                session.delete(paper)
+                return True
+            return False
     except Exception:
         return False
 
@@ -131,6 +144,31 @@ def get_all_users() -> list[dict]:
     with get_db_session() as session:
         users = session.query(User).all()
         return [
-            {"ID": u.id, "用户": u.username, "邮箱": u.email, "角色": u.role, "注册时间": u.created_at}
+            {"ID": u.id, "用户": u.username, "邮箱": u.email, "角色": u.role}
             for u in users
         ]
+
+
+# ================= 系统配置操作 =================
+def get_config(key: str, default: str = None) -> str:
+    """获取系统配置值"""
+    try:
+        with get_db_session() as session:
+            config = session.query(SystemConfig).filter_by(key=key).first()
+            return config.value if config else default
+    except Exception:
+        return default
+
+
+def set_config(key: str, value: str) -> bool:
+    """设置系统配置值"""
+    try:
+        with get_db_session() as session:
+            config = session.query(SystemConfig).filter_by(key=key).first()
+            if config:
+                config.value = str(value)
+            else:
+                session.add(SystemConfig(key=key, value=str(value)))
+            return True
+    except Exception:
+        return False

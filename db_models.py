@@ -8,78 +8,85 @@ load_dotenv()
 
 Base = declarative_base()
 
-# ================= 1. 多对多关联表 =================
-# 记录论文与分组的对应关系
-paper_group_association = Table(
-    'paper_group_association',
-    Base.metadata,
-    Column('paper_id', Integer, ForeignKey('papers.id')),
-    Column('group_id', Integer, ForeignKey('groups.id'))
+# ================= 1. 关联表 =================
+paper_group = Table('paper_group', Base.metadata,
+    Column('paper_id', Integer, ForeignKey('papers.id'), primary_key=True),
+    Column('group_id', Integer, ForeignKey('groups.id'), primary_key=True)
 )
 
-# ================= 2. 用户模型 (新增) =================
-class User(Base):
-    __tablename__ = 'users'
-
-    id = Column(Integer, primary_key=True)
-    username = Column(String(50), unique=True, nullable=False)
-    password_hash = Column(String(128), nullable=False)
-    email = Column(String(100))
-    role = Column(String(20), default="user")  # 'admin' 或 'user'
-    created_at = Column(Integer, default=lambda: int(datetime.now().timestamp()))
-
-    # 反向关联：一个用户拥有多篇论文
-    papers = relationship("Paper", back_populates="owner")
-
-# ================= 3. 论文模型 (修改) =================
+# ================= 2. Paper 模型 =================
 class Paper(Base):
     __tablename__ = 'papers'
 
     id = Column(Integer, primary_key=True)
-    file_md5 = Column(String(32), unique=True, index=True) 
-    title = Column(String)
-    title_cn = Column(String)
-    journal = Column(String)
-    year = Column(String)
+    title = Column(Text)
+    title_cn = Column(Text, nullable=True)
     authors = Column(Text)
-    abstract_en = Column(Text)
-    abstract = Column(Text)
-    detailed_analysis = Column(Text)
-    raw_metadata = Column(JSON)
+    year = Column(String(10))
+    journal = Column(String(100))
+    abstract = Column(Text, nullable=True)
+    abstract_en = Column(Text, nullable=True)
+    detailed_analysis = Column(Text, nullable=True)
+    md5_hash = Column(String(32))
+    owner_id = Column(Integer, ForeignKey("users.id"))
 
-    # 新增：所有者ID (关联到 User)
-    owner_id = Column(Integer, ForeignKey('users.id'))
     owner = relationship("User", back_populates="papers")
+    groups = relationship("Group", secondary=paper_group, back_populates="papers")
 
-    # 建立与分组的反向关联
-    groups = relationship("Group", secondary=paper_group_association, back_populates="papers")
-
-# ================= 4. 分组模型 =================
+# ================= 3. Group 模型 =================
 class Group(Base):
     __tablename__ = 'groups'
+
     id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
+    name = Column(String(100), unique=True)
 
-    # 建立与论文的关联
-    papers = relationship("Paper", secondary=paper_group_association, back_populates="groups")
+    papers = relationship("Paper", secondary=paper_group, back_populates="groups")
 
-# ================= 5. LLM 提供商模型 =================
+# ================= 4. User 模型 =================
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    email = Column(String(100), nullable=True)
+    role = Column(String(20), default="user")
+
+    papers = relationship("Paper", back_populates="owner")
+
+# ================= 5. LLMProvider 模型 =================
 class LLMProvider(Base):
-    __tablename__ = 'llm_providers'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)  # 提供商名称
-    base_url = Column(String(500), nullable=False)  # API 地址
-    api_key = Column(String(500), nullable=False)  # API 密钥
-    pool_type = Column(String(20), nullable=False)  # 'metadata' 或 'analysis'
-    is_primary = Column(Boolean, default=False)  # 是否为主模型
-    priority = Column(Integer, default=100)  # 优先级（数字越小优先级越高）
-    models = Column(String(500), nullable=False)  # 支持的模型列表（逗号分隔）
-    enabled = Column(Boolean, default=True)  # 是否启用
-    created_at = Column(Integer, default=lambda: int(datetime.now().timestamp()))
+    __tablename__ = "llm_providers"
 
-# ================= 5. 初始化 =================
-DB_URL = os.getenv("DB_URL", "sqlite:///papers.db")
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    base_url = Column(String(255), nullable=False)
+    api_key = Column(Text, nullable=False)
+    pool_type = Column(String(20), nullable=False)
+    api_type = Column(String(20), default="openai")  # openai 或 gemini
+    is_primary = Column(Boolean, default=False)
+    priority = Column(Integer, default=100)
+    weight = Column(Integer, default=10)  # 权重，用于负载均衡
+    models = Column(String(255), nullable=False)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(String(50), default=str(datetime.now()))
+
+# ================= 6. SystemConfig 模型 =================
+class SystemConfig(Base):
+    """系统全局配置表"""
+    __tablename__ = "system_config"
+    
+    key = Column(String(50), primary_key=True)
+    value = Column(String(255), nullable=False)
+
+# ================= 6. 初始化 =================
+# 优先从 Streamlit Secrets 读取，其次从环境变量，最后使用默认值
+try:
+    import streamlit as st
+    DB_URL = st.secrets.get("DB_URL", os.getenv("DB_URL", "sqlite:///papers.db"))
+except:
+    DB_URL = os.getenv("DB_URL", "sqlite:///papers.db")
+
 engine = create_engine(DB_URL)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
