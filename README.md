@@ -12,6 +12,7 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
   - **🛡️ 严格隔离**：元数据提取与深度分析池配置互不干扰
   - **🔄 顺序故障转移**：按优先级顺序尝试模型
   - **🔁 智能重试**：可配置单模型重试次数，死磕到底
+- **🎨 现代 UI 设计**：基于 TailwindCSS 的响应式深色界面
 
 ## 🚀 快速开始
 
@@ -83,11 +84,20 @@ cp llm_config.json.example llm_config.json
 
 ### 5. 运行应用
 
+**启动后端 (Port 8000)**
 ```bash
-uivorn main:app
+cd backend
+uvicorn main:app --reload
 ```
 
-### 6. 注册账号
+**启动前端 (Port 3000)**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+访问 `http://localhost:3000`
 
 首次使用需要注册账号。第一个注册的用户默认为管理员。
 
@@ -95,19 +105,18 @@ uivorn main:app
 
 ```
 PaperFlow/
-├── backend/               # 后端代码
-│   ├── routers/           # API 路由
-│   ├── main.py            # FastAPI 入口
+├── backend/               # FastAPI 后端
+│   ├── routers/           # API 路由 (auth, papers, admin等)
+│   ├── main.py            # 应用入口
+│   ├── schemas.py         # Pydantic 模型
 │   └── ...
-├── frontend/              # 前端代码 (Next.js)
-├── db_models.py           # 数据库模型
-├── db_service.py          # 数据库服务
-├── auth_service.py        # 认证服务
-├── llm_pool.py            # LLM 池管理 (顺序故障转移)
-├── llm_service.py         # LLM CRUD 操作
-├── log_service.py         # 日志服务
-├── utils.py               # 工具函数
-├── llm_config.json.example # LLM 配置文件模版
+├── frontend/              # Next.js 前端 (App Router)
+│   ├── app/               # 页面组件
+│   └── ...
+├── db_models.py           # 数据库模型 (Shared)
+├── llm_pool.py            # LLM 核心逻辑
+├── llm_service.py         # LLM CRUD
+├── llm_config.json.example # 配置文件模版
 └── requirements.txt       # 依赖列表
 ```
 
@@ -132,39 +141,32 @@ PaperFlow/
 
 ## 🌐 部署
 
-### Streamlit Community Cloud（推荐）
+### 前后端分离部署
 
-1. Fork 本仓库到你的 GitHub
-2. 访问 [Streamlit Cloud](https://streamlit.io/cloud)
-3. 登录并连接 GitHub 仓库
-4. 在 Secrets 中添加环境变量（可选）
-5. 点击 Deploy
+1. **后端 (FastAPI)**: 推荐部署到 Render / Railway / AWS EC2
+   - 启动命令: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+   - 记得设置环境变量 (DB_URL, OPENAI_API_KEY 等)
 
-### Render / Railway
-
-1. 新建 Web Service
-2. 连接 GitHub 仓库
-3. 设置启动命令：
-   ```bash
-   streamlit run app.py --server.port $PORT --server.headless true
-   ```
-4. 添加环境变量
-5. 部署
+2. **前端 (Next.js)**: 推荐部署到 Vercel / Netlify
+   - Build Command: `npm run build`
+   - Output Directory: `.next` (Vercel 会自动识别)
+   - 环境变量: `NEXT_PUBLIC_API_URL` 指向后端地址
 
 ## 🛠️ 技术栈
 
-- **前端框架**：Streamlit
-- **数据库**：SQLAlchemy + SQLite
-- **AI 集成**：OpenAI SDK（兼容多种 LLM）
+- **前端**：Next.js 16 + React 19 + TailwindCSS 4
+- **后端**：FastAPI + SQLModel/SQLAlchemy
+- **数据库**：SQLite (Dev) / PostgreSQL (Prod)
+- **AI 集成**：OpenAI SDK (支持 OpenAI, Gemini, Claude, DeepSeek 等)
 - **PDF 解析**：PyMuPDF (fitz)
 
 ## 📝 使用流程
 
-1. **登录/注册** → 进入主界面
-2. **上传 PDF** → 左侧栏 "📤 上传新论文"
-3. **AI 处理** → 自动提取元数据 + 生成摘要分析
-4. **管理论文** → 添加标签、查看报告、搜索筛选
-5. **管理员配置** → 调整 LLM 提供商设置
+1. **注册登录** → 进入 Dashboard
+2. **上传论文** → 点击 "上传新论文" 或拖拽 PDF
+3. **AI 处理** → 自动流式生成元数据与分析报告
+4. **管理/搜索** → 分组管理、全文检索、查看报告
+5. **系统配置** → 管理员面板配置 LLM 策略
 
 
 ## 📄 许可证
