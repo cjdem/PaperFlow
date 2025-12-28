@@ -235,6 +235,7 @@ class LLMManager:
                         "api_type": api_type,
                         "is_primary": entry.get("is_primary", False),
                         "weight": weight,
+                        "priority": entry.get("priority", 1),
                         "id": f"[{model}] @ {provider}",
                     })
 
@@ -262,68 +263,71 @@ class LLMManager:
                    temperature: float = 0.7, validator=None):
         """
         调用 LLM，支持:
-          - 按权重负载均衡
-          - 失败后智能重试（排除刚失败的通道）
-          - OpenAI 和 Gemini API
+          - 顺序故障转移 (按 priority 顺序)
+          - 单点竭尽重试 (每个 Provider 重试 N 次后再切换)
+          - OpenAI、Gemini 和 Anthropic API
         """
         target_pool = self.pools.get(pool_name, [])
         if not target_pool:
             raise ValueError(f"❌ 池子 {pool_name} 为空，请在管理面板配置 LLM 提供商")
 
         max_retries = self._get_max_retries()
-        exclude_ids = set()
         last_error = None
 
-        for attempt in range(max_retries):
-            node = self._select_provider(target_pool, exclude_ids)
+        # 按优先级顺序遍历每个 Provider
+        for node in target_pool:
+            provider_id = node['id']
             
-            if node is None:
-                llm_logger.log_exhausted()
-                break
+            # 对当前 Provider 进行最多 max_retries 次尝试
+            for attempt in range(max_retries):
+                try:
+                    if attempt == 0:
+                        llm_logger.log_request(pool_name, provider_id, node['api_type'], node.get('priority', 1))
+                    else:
+                        llm_logger.log_retry(attempt, max_retries, provider_id, str(last_error))
 
-            try:
-                if attempt > 0:
-                    llm_logger.log_retry(attempt, max_retries, node['id'], str(last_error))
-                else:
-                    llm_logger.log_request(pool_name, node['id'], node['api_type'], node['weight'])
+                    # 根据 API 类型调用不同的方法
+                    if node["api_type"] == "gemini":
+                        response = await node["client"].create_chat_completion(
+                            model=node["model"],
+                            messages=messages,
+                            temperature=temperature
+                        )
+                    elif node["api_type"] == "anthropic":
+                        response = await node["client"].create_chat_completion(
+                            model=node["model"],
+                            messages=messages,
+                            temperature=temperature
+                        )
+                    else:  # OpenAI
+                        kwargs = {
+                            "model": node["model"],
+                            "messages": messages,
+                            "temperature": temperature,
+                        }
+                        if response_format:
+                            kwargs["response_format"] = response_format
+                        response = await node["client"].chat.completions.create(**kwargs)
 
-                # 根据 API 类型调用不同的方法
-                if node["api_type"] == "gemini":
-                    response = await node["client"].create_chat_completion(
-                        model=node["model"],
-                        messages=messages,
-                        temperature=temperature
-                    )
-                elif node["api_type"] == "anthropic":
-                    response = await node["client"].create_chat_completion(
-                        model=node["model"],
-                        messages=messages,
-                        temperature=temperature
-                    )
-                else:  # OpenAI
-                    kwargs = {
-                        "model": node["model"],
-                        "messages": messages,
-                        "temperature": temperature,
-                    }
-                    if response_format:
-                        kwargs["response_format"] = response_format
-                    response = await node["client"].chat.completions.create(**kwargs)
+                    # 质检环节
+                    if validator:
+                        content = response.choices[0].message.content
+                        if not validator(content):
+                            raise ValueError(f"内容质检未通过: {content[:50]}...")
 
-                # 质检环节
-                if validator:
-                    content = response.choices[0].message.content
-                    if not validator(content):
-                        raise ValueError(f"内容质检未通过: {content[:50]}...")
+                    return response
 
-                return response
+                except Exception as e:
+                    llm_logger.log_failure(provider_id, str(e))
+                    last_error = e
+                    # 继续当前 Provider 的下一次重试
+                    continue
+            
+            # 当前 Provider 已用尽所有重试次数，切换到下一个
+            logger.warning(f"⚠️ Provider {provider_id} 已用尽 {max_retries} 次重试，切换到下一个")
 
-            except Exception as e:
-                llm_logger.log_failure(node['id'], str(e))
-                exclude_ids.add(node["id"])
-                last_error = e
-                continue
-
+        # 所有 Provider 均已尝试完毕
+        llm_logger.log_exhausted()
         raise last_error or ValueError("所有 LLM 通道均不可用")
 
 

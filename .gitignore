@@ -1,4 +1,4 @@
-# ==================== Python ====================
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,126 +16,114 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# ==================== Virtual Environment ====================
-.venv/
+# Virtual Environment
+.env
+.venv
+env/
 venv/
 ENV/
-env/
 env.bak/
 venv.bak/
 
-# ==================== Database ====================
-*.db
-*.sqlite
-*.sqlite3
-*.db-journal
-papers.db
-papers.db-shm
-papers.db-wal
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
 
-# ==================== Environment Variables & Secrets ====================
-.env
-.env.*
-!.env.example
-llm_config.json
-secrets.toml
-*.key
-*.pem
-*.cert
-
-# ==================== Temporary Files ====================
-temp/
-tmp/
-*.pdf
-*.tmp
-*.bak
-*.backup
-*~.nib
-*.swp
-*.swo
-
-# ==================== Streamlit ====================
-.streamlit/secrets.toml
-.streamlit/config.toml
-.streamlit/credentials.toml
-
-# ==================== IDE & Editors ====================
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-*~
-.DS_Store
-*.code-workspace
-
-# ==================== Testing ====================
-.pytest_cache/
-.coverage
-.coverage.*
+# Unit test / coverage reports
 htmlcov/
 .tox/
 .nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
 coverage.xml
 *.cover
+*.py,cover
 .hypothesis/
 .pytest_cache/
-nosetests.xml
+cover/
 
-# ==================== Type Checking ====================
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Pyre type checker
 .pyre/
-.pytype/
 
-# ==================== Logs ====================
-*.log
-logs/
-*.log.*
-paperflow.log*
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
 
-# ==================== OS ====================
-Thumbs.db
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# System
 .DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
+Thumbs.db
 
-# ==================== Deployment ====================
-.vercel
-.netlify
-.railway
-.render
-.fly
-*.pid
-*.seed
-*.pid.lock
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# ==================== Jupyter Notebook ====================
-.ipynb_checkpoints
-*.ipynb
+# Project specific
+logs/
+temp/
+papers.db
+llm_config.json
+!llm_config.json.example
+!.env.example
 
-# ==================== Package Manager ====================
-poetry.lock
-Pipfile.lock
-pdm.lock
-.pdm.toml
-
-# ==================== Documentation ====================
-docs/_build/
-site/
-
-# ==================== Backup & Archives ====================
-*.zip
-*.tar.gz
-*.rar
-*.7z
+# User Exclusions
+.spec-workflow/
+IFLOW.md
+*.bat
+tests/

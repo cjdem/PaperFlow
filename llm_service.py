@@ -35,12 +35,12 @@ def get_all_providers(pool_type: str = None) -> list[dict]:
 
 
 def get_enabled_providers(pool_type: str) -> list[dict]:
-    """获取启用的提供商，按主模型优先、优先级排序"""
+    """获取启用的提供商，按优先级排序 (priority 越小越优先)"""
     with get_db_session() as session:
         providers = (
             session.query(LLMProvider)
             .filter(LLMProvider.pool_type == pool_type, LLMProvider.enabled == True)
-            .order_by(LLMProvider.is_primary.desc(), LLMProvider.priority)
+            .order_by(LLMProvider.priority.asc())
             .all()
         )
         return [
@@ -53,6 +53,7 @@ def get_enabled_providers(pool_type: str) -> list[dict]:
                 "models": p.models,
                 "is_primary": p.is_primary,
                 "weight": getattr(p, 'weight', 10),
+                "priority": getattr(p, 'priority', 1),
             }
             for p in providers
         ]

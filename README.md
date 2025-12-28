@@ -9,10 +9,9 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
 - **🏷️ 分组管理**：灵活的标签分类系统
 - **🔐 多用户支持**：用户认证与权限管理
 - **⚙️ LLM 配置管理**：可视化管理多个 AI 模型提供商
-  - 主备模式自动切换
-  - 优先级调度
-  - 多密钥负载均衡
-- **🎨 双主题切换**：深色/浅色模式
+  - **🛡️ 严格隔离**：元数据提取与深度分析池配置互不干扰
+  - **🔄 顺序故障转移**：按优先级顺序尝试模型
+  - **🔁 智能重试**：可配置单模型重试次数，死磕到底
 
 ## 🚀 快速开始
 
@@ -63,8 +62,8 @@ cp llm_config.json.example llm_config.json
     {
       "base_url": "https://api.openai.com/v1",
       "api_key": "your-api-key",
-      "model": "gpt-4",
-      "weight": 10,
+      "model": "gpt-4o-mini",
+      "priority": 1,
       "api_type": "openai"
     }
   ],
@@ -72,8 +71,8 @@ cp llm_config.json.example llm_config.json
     {
       "base_url": "https://api.openai.com/v1",
       "api_key": "your-api-key",
-      "model": "gpt-4",
-      "weight": 10,
+      "model": "gpt-4o",
+      "priority": 1,
       "api_type": "openai"
     }
   ]
@@ -85,10 +84,8 @@ cp llm_config.json.example llm_config.json
 ### 5. 运行应用
 
 ```bash
-streamlit run app.py
+uivorn main:app
 ```
-
-访问 `http://localhost:8501`
 
 ### 6. 注册账号
 
@@ -98,17 +95,18 @@ streamlit run app.py
 
 ```
 PaperFlow/
-├── app.py                 # 应用入口
+├── backend/               # 后端代码
+│   ├── routers/           # API 路由
+│   ├── main.py            # FastAPI 入口
+│   └── ...
+├── frontend/              # 前端代码 (Next.js)
 ├── db_models.py           # 数据库模型
 ├── db_service.py          # 数据库服务
 ├── auth_service.py        # 认证服务
-├── llm_pool.py            # LLM 池管理
+├── llm_pool.py            # LLM 池管理 (顺序故障转移)
 ├── llm_service.py         # LLM CRUD 操作
 ├── log_service.py         # 日志服务
-├── ui_components.py       # UI 组件
-├── styles.py              # 主题样式
 ├── utils.py               # 工具函数
-├── main.py                # 论文处理流程
 ├── llm_config.json.example # LLM 配置文件模版
 └── requirements.txt       # 依赖列表
 ```
@@ -124,14 +122,13 @@ PaperFlow/
 
 ### LLM 配置
 - **添加提供商**：配置 API 地址、密钥、支持的模型
-- **设置主力模型**：为每个池（Metadata/Analysis）设置主力
-- **调整优先级**：数字越小优先级越高
+- **优先级管理**：数字越小优先级越高 (1 = 最高)，系统将按优先级顺序尝试
 - **启用/禁用**：灵活控制提供商状态
-- **编辑配置**：支持多行 API 密钥输入
+- **重试配置**：全局设置每个模型的最大重试次数
 
 ### 系统设置
 - **日志开关**：可开启或关闭日志记录功能
-- **LLM 重试次数**：配置 LLM 调用失败后的最大重试次数
+
 
 ## 🌐 部署
 
@@ -169,14 +166,7 @@ PaperFlow/
 4. **管理论文** → 添加标签、查看报告、搜索筛选
 5. **管理员配置** → 调整 LLM 提供商设置
 
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
 
 ## 📄 许可证
 
 MIT License
-
-## 🙏 致谢
-
-感谢所有开源项目的贡献者！
