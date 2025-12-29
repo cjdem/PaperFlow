@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    getMe, logout, getPapers, getGroups, createGroup, deletePaper,
+    getMe, logout, getGroups, createGroup, deletePaper,
     uploadPapersWithProgress, User, Paper, Group, updatePaperGroups, UploadProgress,
-    batchDeletePapers, batchUpdateGroups, batchExportPapers, downloadBlob
+    batchDeletePapers, batchUpdateGroups, batchExportPapers, downloadBlob,
+    getPapersAdvanced, getFilterOptions, FilterOptions
 } from '@/lib/api';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import AdvancedSearch, { SearchParams } from '@/components/AdvancedSearch';
 
 
 export default function PapersPage() {
@@ -16,7 +18,6 @@ export default function PapersPage() {
     const [papers, setPapers] = useState<Paper[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [currentView, setCurrentView] = useState('all');
-    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
@@ -24,6 +25,17 @@ export default function PapersPage() {
     const [expandedPaper, setExpandedPaper] = useState<number | null>(null);
     const [detailTab, setDetailTab] = useState<'analysis' | 'abstract_cn' | 'abstract_en'>('analysis');
     const [newGroupName, setNewGroupName] = useState('');
+
+    // 高级搜索状态
+    const [searchParams, setSearchParams] = useState<SearchParams>({
+        search: '',
+        searchFields: ['all'],
+        yearFrom: '',
+        yearTo: '',
+        journals: []
+    });
+    const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+    const [loadingOptions, setLoadingOptions] = useState(false);
 
     // 批量操作状态
     const [selectionMode, setSelectionMode] = useState(false);
@@ -34,11 +46,32 @@ export default function PapersPage() {
     const [batchSelectedGroups, setBatchSelectedGroups] = useState<Set<string>>(new Set());
     const [batchLoading, setBatchLoading] = useState(false);
 
+    // 加载筛选选项
+    const loadFilterOptions = useCallback(async () => {
+        if (filterOptions) return; // 已加载过
+        setLoadingOptions(true);
+        try {
+            const options = await getFilterOptions();
+            setFilterOptions(options);
+        } catch (err) {
+            console.error('加载筛选选项失败:', err);
+        } finally {
+            setLoadingOptions(false);
+        }
+    }, [filterOptions]);
+
     // 加载数据
     const loadData = useCallback(async () => {
         try {
             const [papersData, groupsData] = await Promise.all([
-                getPapers(currentView, searchQuery || undefined),
+                getPapersAdvanced({
+                    view: currentView,
+                    search: searchParams.search || undefined,
+                    searchFields: searchParams.searchFields,
+                    yearFrom: searchParams.yearFrom || undefined,
+                    yearTo: searchParams.yearTo || undefined,
+                    journals: searchParams.journals.length > 0 ? searchParams.journals : undefined
+                }),
                 getGroups()
             ]);
             setPapers(papersData.papers);
@@ -46,7 +79,7 @@ export default function PapersPage() {
         } catch (err) {
             console.error('加载数据失败:', err);
         }
-    }, [currentView, searchQuery]);
+    }, [currentView, searchParams]);
 
     useEffect(() => {
         const init = async () => {
@@ -65,7 +98,19 @@ export default function PapersPage() {
 
     useEffect(() => {
         if (user) loadData();
-    }, [currentView, searchQuery, user, loadData]);
+    }, [currentView, searchParams, user, loadData]);
+
+    // 处理高级搜索
+    const handleAdvancedSearch = (params: SearchParams) => {
+        setSearchParams(params);
+    };
+
+    // 高级搜索面板展开时加载筛选选项
+    const handleSearchExpandChange = (expanded: boolean) => {
+        if (expanded) {
+            loadFilterOptions();
+        }
+    };
 
     const handleLogout = () => {
         logout();
@@ -305,6 +350,12 @@ export default function PapersPage() {
                     >
                         📂 未分类
                     </button>
+                    <button
+                        onClick={() => router.push('/workspaces')}
+                        className="w-full text-left px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700"
+                    >
+                        👥 团队空间
+                    </button>
 
                     <div className="pt-4 border-t border-slate-700">
                         <p className="text-xs text-gray-500 mb-2">分组</p>
@@ -439,30 +490,34 @@ export default function PapersPage() {
 
             {/* 主内容 */}
             <main className="flex-1 p-6 overflow-auto">
-                {/* 搜索栏和多选模式开关 */}
-                <div className="mb-6 flex items-center gap-4">
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="🔍 搜索论文..."
-                        className="flex-1 max-w-md px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500"
-                    />
-                    <button
-                        onClick={() => {
-                            if (selectionMode) {
-                                exitSelectionMode();
-                            } else {
-                                setSelectionMode(true);
-                            }
-                        }}
-                        className={`px-4 py-3 rounded-lg font-medium transition ${selectionMode
+                {/* 高级搜索栏 */}
+                <div className="mb-6">
+                    <div className="flex items-start gap-4">
+                        <div className="flex-1">
+                            <AdvancedSearch
+                                onSearch={handleAdvancedSearch}
+                                initialSearch={searchParams.search}
+                                filterOptions={filterOptions}
+                                loadingOptions={loadingOptions}
+                                onExpandChange={handleSearchExpandChange}
+                            />
+                        </div>
+                        <button
+                            onClick={() => {
+                                if (selectionMode) {
+                                    exitSelectionMode();
+                                } else {
+                                    setSelectionMode(true);
+                                }
+                            }}
+                            className={`px-4 py-3 rounded-lg font-medium transition whitespace-nowrap ${selectionMode
                                 ? 'bg-purple-600 text-white'
                                 : 'bg-slate-800 border border-slate-700 text-gray-300 hover:bg-slate-700'
-                            }`}
-                    >
-                        {selectionMode ? '✓ 多选模式' : '☐ 多选模式'}
-                    </button>
+                                }`}
+                        >
+                            {selectionMode ? '✓ 多选模式' : '☐ 多选模式'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* 批量操作工具栏 */}
@@ -522,8 +577,8 @@ export default function PapersPage() {
                             <div
                                 key={paper.id}
                                 className={`bg-slate-800 border rounded-xl overflow-hidden transition ${selectionMode && selectedPapers.has(paper.id)
-                                        ? 'border-purple-500 ring-2 ring-purple-500/30'
-                                        : 'border-slate-700'
+                                    ? 'border-purple-500 ring-2 ring-purple-500/30'
+                                    : 'border-slate-700'
                                     }`}
                             >
                                 {/* 论文卡片 */}
@@ -690,8 +745,8 @@ export default function PapersPage() {
                                     <button
                                         onClick={() => setBatchGroupAction('add')}
                                         className={`flex-1 px-3 py-2 rounded-lg text-sm transition ${batchGroupAction === 'add'
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
                                             }`}
                                     >
                                         添加到分组
@@ -699,8 +754,8 @@ export default function PapersPage() {
                                     <button
                                         onClick={() => setBatchGroupAction('remove')}
                                         className={`flex-1 px-3 py-2 rounded-lg text-sm transition ${batchGroupAction === 'remove'
-                                                ? 'bg-orange-600 text-white'
-                                                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                            ? 'bg-orange-600 text-white'
+                                            : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
                                             }`}
                                     >
                                         从分组移除
@@ -708,8 +763,8 @@ export default function PapersPage() {
                                     <button
                                         onClick={() => setBatchGroupAction('set')}
                                         className={`flex-1 px-3 py-2 rounded-lg text-sm transition ${batchGroupAction === 'set'
-                                                ? 'bg-purple-600 text-white'
-                                                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                            ? 'bg-purple-600 text-white'
+                                            : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
                                             }`}
                                     >
                                         设为指定
@@ -728,8 +783,8 @@ export default function PapersPage() {
                                             <label
                                                 key={g.id}
                                                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${batchSelectedGroups.has(g.name)
-                                                        ? 'bg-purple-600/30 border border-purple-500'
-                                                        : 'bg-slate-700 border border-transparent hover:bg-slate-600'
+                                                    ? 'bg-purple-600/30 border border-purple-500'
+                                                    : 'bg-slate-700 border border-transparent hover:bg-slate-600'
                                                     }`}
                                             >
                                                 <input

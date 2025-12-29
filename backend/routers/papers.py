@@ -3,7 +3,8 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from typing import Optional
+from sqlalchemy import or_
+from typing import Optional, List
 
 import sys
 import os
@@ -13,7 +14,8 @@ from db_models import Paper, Group, User
 from deps import get_db, get_current_user
 from schemas import (
     PaperResponse, PaperListResponse, UpdatePaperGroupsRequest, GroupInfo,
-    BatchDeleteRequest, BatchDeleteResponse, BatchGroupRequest, BatchGroupResponse
+    BatchDeleteRequest, BatchDeleteResponse, BatchGroupRequest, BatchGroupResponse,
+    FilterOptionsResponse, JournalOption
 )
 
 router = APIRouter(prefix="/api/papers", tags=["论文"])
@@ -36,14 +38,49 @@ def paper_to_response(paper: Paper) -> PaperResponse:
     )
 
 
+@router.get("/filter-options", response_model=FilterOptionsResponse)
+async def get_filter_options(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取筛选选项（年份列表、期刊列表）"""
+    query = db.query(Paper)
+    
+    # 非管理员只能看自己的论文
+    if current_user.role != "admin":
+        query = query.filter(Paper.owner_id == current_user.id)
+    
+    papers = query.all()
+    
+    # 统计年份（去重并排序）
+    years = sorted(set(p.year for p in papers if p.year), reverse=True)
+    
+    # 统计期刊（带数量）
+    journal_counts = {}
+    for p in papers:
+        if p.journal:
+            journal_counts[p.journal] = journal_counts.get(p.journal, 0) + 1
+    
+    journals = [
+        JournalOption(name=name, count=count)
+        for name, count in sorted(journal_counts.items(), key=lambda x: -x[1])
+    ]
+    
+    return FilterOptionsResponse(years=years, journals=journals)
+
+
 @router.get("", response_model=PaperListResponse)
 async def get_papers(
     view: str = Query("all", description="视图模式: all, ungrouped, 或分组名"),
     search: Optional[str] = Query(None, description="搜索关键词"),
+    search_fields: Optional[str] = Query("all", description="搜索字段: all, title, authors, abstract, journal（逗号分隔）"),
+    year_from: Optional[str] = Query(None, description="起始年份"),
+    year_to: Optional[str] = Query(None, description="结束年份"),
+    journals: Optional[str] = Query(None, description="期刊列表（逗号分隔）"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取论文列表"""
+    """获取论文列表（支持高级搜索）"""
     query = (
         db.query(Paper)
         .options(joinedload(Paper.groups), joinedload(Paper.owner))
@@ -60,14 +97,40 @@ async def get_papers(
     elif view != "all":
         query = query.filter(Paper.groups.any(name=view))
     
-    # 搜索过滤
+    # 高级搜索过滤
     if search:
         q = search.lower()
-        query = query.filter(
-            (Paper.title.ilike(f"%{q}%"))
-            | (Paper.title_cn.ilike(f"%{q}%"))
-            | (Paper.authors.ilike(f"%{q}%"))
-        )
+        fields = [f.strip() for f in search_fields.split(",")] if search_fields else ["all"]
+        
+        conditions = []
+        if "all" in fields or "title" in fields:
+            conditions.extend([
+                Paper.title.ilike(f"%{q}%"),
+                Paper.title_cn.ilike(f"%{q}%")
+            ])
+        if "all" in fields or "authors" in fields:
+            conditions.append(Paper.authors.ilike(f"%{q}%"))
+        if "all" in fields or "abstract" in fields:
+            conditions.extend([
+                Paper.abstract.ilike(f"%{q}%"),
+                Paper.abstract_en.ilike(f"%{q}%")
+            ])
+        if "all" in fields or "journal" in fields:
+            conditions.append(Paper.journal.ilike(f"%{q}%"))
+        
+        if conditions:
+            query = query.filter(or_(*conditions))
+    
+    # 年份筛选
+    if year_from:
+        query = query.filter(Paper.year >= year_from)
+    if year_to:
+        query = query.filter(Paper.year <= year_to)
+    
+    # 期刊筛选
+    if journals:
+        journal_list = [j.strip() for j in journals.split(",")]
+        query = query.filter(Paper.journal.in_(journal_list))
     
     papers = query.all()
     return PaperListResponse(

@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 复用 db_models 中的数据库配置，确保使用同一个数据库
-from db_models import Base, User, Session as DBSession
+from db_models import Base, User, Session as DBSession, Workspace, WorkspaceMember
 
 load_dotenv()
 
@@ -85,3 +85,78 @@ async def get_current_admin(current_user: User = Depends(get_current_user)) -> U
             detail="需要管理员权限"
         )
     return current_user
+
+
+# ================= 空间权限检查 =================
+def get_workspace_member(
+    workspace_id: int,
+    user: User,
+    db: Session
+) -> WorkspaceMember | None:
+    """获取用户在空间中的成员记录"""
+    return db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == user.id
+    ).first()
+
+
+def check_workspace_access(
+    workspace_id: int,
+    user: User,
+    db: Session,
+    required_roles: list[str] | None = None
+) -> tuple[Workspace, WorkspaceMember]:
+    """
+    检查用户是否有权访问空间
+    
+    Args:
+        workspace_id: 空间 ID
+        user: 当前用户
+        db: 数据库会话
+        required_roles: 需要的角色列表，None 表示只需是成员即可
+    
+    Returns:
+        (workspace, member) 元组
+    
+    Raises:
+        HTTPException: 空间不存在或无权访问
+    """
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="空间不存在"
+        )
+    
+    member = get_workspace_member(workspace_id, user, db)
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="您不是此空间的成员"
+        )
+    
+    if required_roles and member.role not in required_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"需要 {', '.join(required_roles)} 权限"
+        )
+    
+    return workspace, member
+
+
+def check_workspace_admin(
+    workspace_id: int,
+    user: User,
+    db: Session
+) -> tuple[Workspace, WorkspaceMember]:
+    """检查用户是否是空间管理员（owner 或 admin）"""
+    return check_workspace_access(workspace_id, user, db, ["owner", "admin"])
+
+
+def check_workspace_owner(
+    workspace_id: int,
+    user: User,
+    db: Session
+) -> tuple[Workspace, WorkspaceMember]:
+    """检查用户是否是空间所有者"""
+    return check_workspace_access(workspace_id, user, db, ["owner"])

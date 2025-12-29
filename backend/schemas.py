@@ -66,6 +66,19 @@ class UpdatePaperGroupsRequest(BaseModel):
     groups: list[str]
 
 
+# ================= Filter Options =================
+class JournalOption(BaseModel):
+    """期刊选项（带论文数量）"""
+    name: str
+    count: int
+
+
+class FilterOptionsResponse(BaseModel):
+    """筛选选项响应"""
+    years: list[str]
+    journals: list[JournalOption]
+
+
 # ================= Groups =================
 class CreateGroupRequest(BaseModel):
     name: str
@@ -156,3 +169,123 @@ class BatchGroupResponse(BaseModel):
 class BatchExportRequest(BaseModel):
     paper_ids: list[int]
     format: str  # csv, bibtex, markdown, json
+
+
+# ================= Workspace（团队空间）=================
+class CreateWorkspaceRequest(BaseModel):
+    """创建空间请求"""
+    name: str
+    description: Optional[str] = None
+
+
+class UpdateWorkspaceRequest(BaseModel):
+    """更新空间请求"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class WorkspaceMemberResponse(BaseModel):
+    """空间成员响应"""
+    id: int
+    user_id: int
+    username: str
+    role: str  # owner, admin, member
+    joined_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class WorkspaceResponse(BaseModel):
+    """空间响应"""
+    id: int
+    name: str
+    description: Optional[str] = None
+    owner_id: int
+    owner_username: str
+    member_count: int
+    paper_count: int
+    created_at: str
+    my_role: str  # 当前用户在此空间的角色
+
+    class Config:
+        from_attributes = True
+
+
+class WorkspaceListResponse(BaseModel):
+    """空间列表响应"""
+    workspaces: list[WorkspaceResponse]
+    total: int
+
+
+class WorkspaceDetailResponse(BaseModel):
+    """空间详情响应（包含成员列表）"""
+    id: int
+    name: str
+    description: Optional[str] = None
+    owner_id: int
+    owner_username: str
+    member_count: int
+    paper_count: int
+    created_at: str
+    updated_at: str
+    my_role: str
+    members: list[WorkspaceMemberResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class InviteUserRequest(BaseModel):
+    """邀请用户请求"""
+    username: str  # 通过用户名邀请
+
+
+class InvitationResponse(BaseModel):
+    """邀请响应"""
+    id: int
+    workspace_id: int
+    workspace_name: str
+    inviter_id: int
+    inviter_username: str
+    invitee_id: int
+    invitee_username: str
+    status: str  # pending, accepted, rejected, expired
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class InvitationListResponse(BaseModel):
+    """邀请列表响应"""
+    invitations: list[InvitationResponse]
+    total: int
+
+
+class SharePaperRequest(BaseModel):
+    """分享论文请求"""
+    paper_ids: list[int]  # 支持批量分享
+
+
+class WorkspacePaperResponse(BaseModel):
+    """空间论文响应"""
+    id: int
+    paper: PaperResponse
+    shared_by_id: int
+    shared_by_username: str
+    shared_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class WorkspacePaperListResponse(BaseModel):
+    """空间论文列表响应"""
+    papers: list[WorkspacePaperResponse]
+    total: int
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    """更新成员角色请求"""
+    role: str  # admin, member

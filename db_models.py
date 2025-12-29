@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, JSON, Table, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Text, JSON, Table, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 import os
 from datetime import datetime
@@ -53,6 +53,9 @@ class User(Base):
     role = Column(String(20), default="user")
 
     papers = relationship("Paper", back_populates="owner")
+    # 团队空间关系
+    owned_workspaces = relationship("Workspace", back_populates="owner")
+    workspace_memberships = relationship("WorkspaceMember", back_populates="user")
 
 # ================= 5. LLMProvider 模型 =================
 class LLMProvider(Base):
@@ -79,7 +82,80 @@ class SystemConfig(Base):
     key = Column(String(50), primary_key=True)
     value = Column(String(255), nullable=False)
 
-# ================= 6. 初始化 =================
+# ================= 7. Workspace 模型（团队空间）=================
+class Workspace(Base):
+    """团队空间"""
+    __tablename__ = 'workspaces'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(String(50), default=lambda: datetime.now().isoformat())
+    updated_at = Column(String(50), default=lambda: datetime.now().isoformat())
+    
+    # 关系
+    owner = relationship("User", back_populates="owned_workspaces")
+    members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
+    papers = relationship("WorkspacePaper", back_populates="workspace", cascade="all, delete-orphan")
+    invitations = relationship("WorkspaceInvitation", back_populates="workspace", cascade="all, delete-orphan")
+
+# ================= 8. WorkspaceMember 模型（空间成员）=================
+class WorkspaceMember(Base):
+    """空间成员"""
+    __tablename__ = 'workspace_members'
+    
+    id = Column(Integer, primary_key=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String(20), default="member")  # owner, admin, member
+    joined_at = Column(String(50), default=lambda: datetime.now().isoformat())
+    
+    # 关系
+    workspace = relationship("Workspace", back_populates="members")
+    user = relationship("User", back_populates="workspace_memberships")
+    
+    # 唯一约束：一个用户在一个空间只能有一个成员记录
+    __table_args__ = (UniqueConstraint('workspace_id', 'user_id', name='uq_workspace_user'),)
+
+# ================= 9. WorkspaceInvitation 模型（邀请）=================
+class WorkspaceInvitation(Base):
+    """空间邀请"""
+    __tablename__ = 'workspace_invitations'
+    
+    id = Column(Integer, primary_key=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=False)
+    inviter_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    invitee_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String(20), default="pending")  # pending, accepted, rejected, expired
+    created_at = Column(String(50), default=lambda: datetime.now().isoformat())
+    expires_at = Column(String(50), nullable=True)  # 可选的过期时间
+    
+    # 关系
+    workspace = relationship("Workspace", back_populates="invitations")
+    inviter = relationship("User", foreign_keys=[inviter_id])
+    invitee = relationship("User", foreign_keys=[invitee_id])
+
+# ================= 10. WorkspacePaper 模型（空间论文关联）=================
+class WorkspacePaper(Base):
+    """空间论文关联"""
+    __tablename__ = 'workspace_papers'
+    
+    id = Column(Integer, primary_key=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=False)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False)
+    shared_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    shared_at = Column(String(50), default=lambda: datetime.now().isoformat())
+    
+    # 关系
+    workspace = relationship("Workspace", back_populates="papers")
+    paper = relationship("Paper")
+    sharer = relationship("User")
+    
+    # 唯一约束：一篇论文在一个空间只能存在一次
+    __table_args__ = (UniqueConstraint('workspace_id', 'paper_id', name='uq_workspace_paper'),)
+
+# ================= 11. 初始化 =================
 # 优先从 Streamlit Secrets 读取，其次从环境变量，最后使用默认值
 try:
     import streamlit as st
