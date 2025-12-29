@@ -85,6 +85,7 @@ export default function AdminPage() {
     const [isAdding, setIsAdding] = useState(false);
     const [formData, setFormData] = useState(createEmptyProvider('metadata'));
     const [retryCount, setRetryCount] = useState('3');  // 重试次数配置
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');  // 保存状态
 
     useEffect(() => {
         const init = async () => {
@@ -167,49 +168,134 @@ export default function AdminPage() {
     };
 
     const handleSave = async () => {
+        setSaveStatus('saving');
         const headers = getHeaders();
-        if (isAdding) {
-            await fetch(`${API_BASE}/api/admin/llm-providers`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(formData)
-            });
-        } else if (editingProvider) {
-            await fetch(`${API_BASE}/api/admin/llm-providers/${editingProvider.id}`, {
-                method: 'PUT',
-                headers,
-                body: JSON.stringify(formData)
-            });
+
+        try {
+            let response;
+            if (isAdding) {
+                response = await fetch(`${API_BASE}/api/admin/llm-providers`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(formData)
+                });
+            } else if (editingProvider) {
+                response = await fetch(`${API_BASE}/api/admin/llm-providers/${editingProvider.id}`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(formData)
+                });
+            }
+
+            if (!response?.ok) {
+                throw new Error('保存失败');
+            }
+
+            // 获取保存后的数据
+            const savedProvider: LLMProvider = await response.json();
+
+            // 乐观更新：立即更新本地状态
+            if (isAdding) {
+                setProviders(prev => [...prev, savedProvider]);
+            } else if (editingProvider) {
+                setProviders(prev => prev.map(p =>
+                    p.id === editingProvider.id ? savedProvider : p
+                ));
+            }
+
+            setSaveStatus('saved');
+            setEditingProvider(null);
+            setIsAdding(false);
+
+            // 2秒后重置状态
+            setTimeout(() => setSaveStatus('idle'), 2000);
+
+        } catch (error) {
+            setSaveStatus('error');
+            console.error('保存失败:', error);
+            // 3秒后重置状态
+            setTimeout(() => setSaveStatus('idle'), 3000);
         }
-        setEditingProvider(null);
-        setIsAdding(false);
-        await loadData();
     };
 
     const handleDelete = async (id: number) => {
         if (!confirm('确定要删除这个 LLM 提供商吗？')) return;
-        await fetch(`${API_BASE}/api/admin/llm-providers/${id}`, {
-            method: 'DELETE',
-            headers: getHeaders()
-        });
-        await loadData();
+
+        // 乐观更新：立即从列表中移除
+        const previousProviders = [...providers];
+        setProviders(prev => prev.filter(p => p.id !== id));
+
+        try {
+            const res = await fetch(`${API_BASE}/api/admin/llm-providers/${id}`, {
+                method: 'DELETE',
+                headers: getHeaders()
+            });
+
+            if (!res.ok) {
+                // 失败时回滚
+                setProviders(previousProviders);
+            }
+        } catch {
+            // 失败时回滚
+            setProviders(previousProviders);
+        }
     };
 
     const toggleProvider = async (id: number, enabled: boolean) => {
-        await fetch(`${API_BASE}/api/admin/llm-providers/${id}/toggle`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ enabled: !enabled })
-        });
-        await loadData();
+        // 乐观更新：立即更新本地状态
+        setProviders(prev => prev.map(p =>
+            p.id === id ? { ...p, enabled: !enabled } : p
+        ));
+
+        try {
+            const res = await fetch(`${API_BASE}/api/admin/llm-providers/${id}/toggle`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ enabled: !enabled })
+            });
+
+            if (!res.ok) {
+                // 失败时回滚
+                setProviders(prev => prev.map(p =>
+                    p.id === id ? { ...p, enabled: enabled } : p
+                ));
+            }
+        } catch {
+            // 失败时回滚
+            setProviders(prev => prev.map(p =>
+                p.id === id ? { ...p, enabled: enabled } : p
+            ));
+        }
     };
 
     const setPrimary = async (id: number) => {
-        await fetch(`${API_BASE}/api/admin/llm-providers/${id}/set-primary`, {
-            method: 'POST',
-            headers: getHeaders()
-        });
-        await loadData();
+        // 找到当前 provider 的 pool_type
+        const targetProvider = providers.find(p => p.id === id);
+        if (!targetProvider) return;
+
+        // 乐观更新：立即更新本地状态
+        const previousProviders = [...providers];
+        setProviders(prev => prev.map(p => {
+            if (p.pool_type === targetProvider.pool_type) {
+                return { ...p, is_primary: p.id === id };
+            }
+            return p;
+        }));
+
+        try {
+            const res = await fetch(`${API_BASE}/api/admin/llm-providers/${id}/set-primary`, {
+                method: 'POST',
+                headers: getHeaders()
+            });
+
+            if (!res.ok) {
+                // 失败时回滚
+                setProviders(previousProviders);
+            }
+        } catch {
+            // 失败时回滚
+            setProviders(previousProviders);
+        }
     };
 
     // 按池类型过滤提供商
@@ -289,7 +375,7 @@ export default function AdminPage() {
                             placeholder="例如：gpt-4o, gpt-4o-mini"
                             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
                         />
-                        <p className="text-xs text-gray-500 mt-1">多个模型用逗号分隔</p>
+                        <p className="text-xs text-gray-500 mt-1">多个模型用逗号分隔，按顺序依次尝试（前一个失败后尝试下一个）</p>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-400 mb-1">优先级 (1 最高)</label>
@@ -305,12 +391,24 @@ export default function AdminPage() {
                     </div>
                 </div>
                 <div className="flex gap-2 mt-4">
-                    <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        💾 保存
+                    <button
+                        onClick={handleSave}
+                        disabled={saveStatus === 'saving'}
+                        className={`px-4 py-2 text-white rounded-lg transition-all min-w-[100px] ${saveStatus === 'saving' ? 'bg-blue-400 cursor-wait' :
+                            saveStatus === 'saved' ? 'bg-green-600' :
+                                saveStatus === 'error' ? 'bg-red-600' :
+                                    'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                    >
+                        {saveStatus === 'saving' ? '⏳ 保存中...' :
+                            saveStatus === 'saved' ? '✅ 已保存' :
+                                saveStatus === 'error' ? '❌ 保存失败' :
+                                    '💾 保存'}
                     </button>
                     <button
-                        onClick={() => { setEditingProvider(null); setIsAdding(false); }}
+                        onClick={() => { setEditingProvider(null); setIsAdding(false); setSaveStatus('idle'); }}
                         className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"
+                        disabled={saveStatus === 'saving'}
                     >
                         取消
                     </button>

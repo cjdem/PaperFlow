@@ -11,7 +11,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import Paper, Group, User
 
 from deps import get_db, get_current_user
-from schemas import PaperResponse, PaperListResponse, UpdatePaperGroupsRequest, GroupInfo
+from schemas import (
+    PaperResponse, PaperListResponse, UpdatePaperGroupsRequest, GroupInfo,
+    BatchDeleteRequest, BatchDeleteResponse, BatchGroupRequest, BatchGroupResponse
+)
 
 router = APIRouter(prefix="/api/papers", tags=["论文"])
 
@@ -141,3 +144,77 @@ async def update_paper_groups(
     db.commit()
     
     return {"message": "分组更新成功"}
+
+
+# ================= 批量操作 API =================
+
+@router.delete("/batch", response_model=BatchDeleteResponse)
+async def batch_delete_papers(
+    request: BatchDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """批量删除论文"""
+    deleted_count = 0
+    failed_ids = []
+    
+    for paper_id in request.paper_ids:
+        paper = db.query(Paper).filter(Paper.id == paper_id).first()
+        if not paper:
+            failed_ids.append(paper_id)
+            continue
+        
+        # 权限检查
+        if current_user.role != "admin" and paper.owner_id != current_user.id:
+            failed_ids.append(paper_id)
+            continue
+        
+        db.delete(paper)
+        deleted_count += 1
+    
+    db.commit()
+    return BatchDeleteResponse(
+        message=f"成功删除 {deleted_count} 篇论文",
+        deleted_count=deleted_count,
+        failed_ids=failed_ids
+    )
+
+
+@router.put("/batch/groups", response_model=BatchGroupResponse)
+async def batch_update_groups(
+    request: BatchGroupRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """批量更新论文分组"""
+    updated_count = 0
+    target_groups = db.query(Group).filter(Group.name.in_(request.groups)).all()
+    
+    for paper_id in request.paper_ids:
+        paper = db.query(Paper).filter(Paper.id == paper_id).first()
+        if not paper:
+            continue
+        
+        # 权限检查
+        if current_user.role != "admin" and paper.owner_id != current_user.id:
+            continue
+        
+        if request.action == "add":
+            # 添加到分组
+            for g in target_groups:
+                if g not in paper.groups:
+                    paper.groups.append(g)
+        elif request.action == "remove":
+            # 从分组移除
+            paper.groups = [g for g in paper.groups if g not in target_groups]
+        elif request.action == "set":
+            # 设置为指定分组
+            paper.groups = target_groups
+        
+        updated_count += 1
+    
+    db.commit()
+    return BatchGroupResponse(
+        message=f"成功更新 {updated_count} 篇论文的分组",
+        updated_count=updated_count
+    )

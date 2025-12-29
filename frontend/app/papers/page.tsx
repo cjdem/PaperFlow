@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getMe, logout, getPapers, getGroups, createGroup, deletePaper, uploadPapersWithProgress, User, Paper, Group, updatePaperGroups, UploadProgress } from '@/lib/api';
+import {
+    getMe, logout, getPapers, getGroups, createGroup, deletePaper,
+    uploadPapersWithProgress, User, Paper, Group, updatePaperGroups, UploadProgress,
+    batchDeletePapers, batchUpdateGroups, batchExportPapers, downloadBlob
+} from '@/lib/api';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 
@@ -20,6 +24,15 @@ export default function PapersPage() {
     const [expandedPaper, setExpandedPaper] = useState<number | null>(null);
     const [detailTab, setDetailTab] = useState<'analysis' | 'abstract_cn' | 'abstract_en'>('analysis');
     const [newGroupName, setNewGroupName] = useState('');
+
+    // 批量操作状态
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedPapers, setSelectedPapers] = useState<Set<number>>(new Set());
+    const [showGroupModal, setShowGroupModal] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [batchGroupAction, setBatchGroupAction] = useState<'add' | 'remove' | 'set'>('add');
+    const [batchSelectedGroups, setBatchSelectedGroups] = useState<Set<string>>(new Set());
+    const [batchLoading, setBatchLoading] = useState(false);
 
     // 加载数据
     const loadData = useCallback(async () => {
@@ -136,6 +149,123 @@ export default function PapersPage() {
         }
     };
 
+    // ================= 批量操作函数 =================
+
+    // 切换选择单篇论文
+    const toggleSelection = (paperId: number) => {
+        setSelectedPapers(prev => {
+            const next = new Set(prev);
+            if (next.has(paperId)) {
+                next.delete(paperId);
+            } else {
+                next.add(paperId);
+            }
+            return next;
+        });
+    };
+
+    // 全选/取消全选
+    const toggleSelectAll = () => {
+        if (selectedPapers.size === papers.length) {
+            setSelectedPapers(new Set());
+        } else {
+            setSelectedPapers(new Set(papers.map(p => p.id)));
+        }
+    };
+
+    // 退出多选模式
+    const exitSelectionMode = () => {
+        setSelectionMode(false);
+        setSelectedPapers(new Set());
+    };
+
+    // 批量删除
+    const handleBatchDelete = async () => {
+        if (selectedPapers.size === 0) return;
+        if (!confirm(`确定要删除选中的 ${selectedPapers.size} 篇论文吗？此操作不可撤销。`)) return;
+
+        setBatchLoading(true);
+        try {
+            const result = await batchDeletePapers(Array.from(selectedPapers));
+            alert(result.message);
+            setSelectedPapers(new Set());
+            await loadData();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '批量删除失败');
+        } finally {
+            setBatchLoading(false);
+        }
+    };
+
+    // 打开批量分组弹窗
+    const openGroupModal = () => {
+        setBatchSelectedGroups(new Set());
+        setBatchGroupAction('add');
+        setShowGroupModal(true);
+    };
+
+    // 执行批量分组
+    const handleBatchGroup = async () => {
+        if (selectedPapers.size === 0 || batchSelectedGroups.size === 0) return;
+
+        setBatchLoading(true);
+        try {
+            const result = await batchUpdateGroups(
+                Array.from(selectedPapers),
+                batchGroupAction,
+                Array.from(batchSelectedGroups)
+            );
+            alert(result.message);
+            setShowGroupModal(false);
+            await loadData();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '批量分组失败');
+        } finally {
+            setBatchLoading(false);
+        }
+    };
+
+    // 打开批量导出弹窗
+    const openExportModal = () => {
+        setShowExportModal(true);
+    };
+
+    // 执行批量导出
+    const handleBatchExport = async (format: 'csv' | 'bibtex' | 'markdown' | 'json') => {
+        if (selectedPapers.size === 0) return;
+
+        setBatchLoading(true);
+        try {
+            const blob = await batchExportPapers(Array.from(selectedPapers), format);
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const extensions: Record<string, string> = {
+                csv: 'csv',
+                bibtex: 'bib',
+                markdown: 'md',
+                json: 'json'
+            };
+            downloadBlob(blob, `papers_export_${timestamp}.${extensions[format]}`);
+            setShowExportModal(false);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '导出失败');
+        } finally {
+            setBatchLoading(false);
+        }
+    };
+
+    // 切换批量分组选择
+    const toggleBatchGroupSelection = (groupName: string) => {
+        setBatchSelectedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupName)) {
+                next.delete(groupName);
+            } else {
+                next.add(groupName);
+            }
+            return next;
+        });
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -147,7 +277,7 @@ export default function PapersPage() {
     return (
         <div className="min-h-screen bg-slate-900 flex">
             {/* 侧边栏 */}
-            <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
+            <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col h-screen sticky top-0">
                 <div className="p-4 border-b border-slate-700">
                     <h1 className="text-xl font-bold text-white">🧬 PaperFlow</h1>
                     <p className="text-sm text-gray-400 mt-1">👤 {user?.username}</p>
@@ -162,7 +292,7 @@ export default function PapersPage() {
                 </div>
 
                 {/* 导航 */}
-                <nav className="flex-1 p-4 space-y-2">
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     <button
                         onClick={() => setCurrentView('all')}
                         className={`w-full text-left px-3 py-2 rounded-lg transition ${currentView === 'all' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:bg-slate-700'}`}
@@ -309,16 +439,77 @@ export default function PapersPage() {
 
             {/* 主内容 */}
             <main className="flex-1 p-6 overflow-auto">
-                {/* 搜索栏 */}
-                <div className="mb-6">
+                {/* 搜索栏和多选模式开关 */}
+                <div className="mb-6 flex items-center gap-4">
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="🔍 搜索论文..."
-                        className="w-full max-w-md px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500"
+                        className="flex-1 max-w-md px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500"
                     />
+                    <button
+                        onClick={() => {
+                            if (selectionMode) {
+                                exitSelectionMode();
+                            } else {
+                                setSelectionMode(true);
+                            }
+                        }}
+                        className={`px-4 py-3 rounded-lg font-medium transition ${selectionMode
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-800 border border-slate-700 text-gray-300 hover:bg-slate-700'
+                            }`}
+                    >
+                        {selectionMode ? '✓ 多选模式' : '☐ 多选模式'}
+                    </button>
                 </div>
+
+                {/* 批量操作工具栏 */}
+                {selectionMode && (
+                    <div className="mb-4 p-4 bg-purple-900/30 border border-purple-500/50 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <span className="text-purple-300">
+                                ☑ 已选择 {selectedPapers.size} 篇论文
+                            </span>
+                            <button
+                                onClick={toggleSelectAll}
+                                className="text-sm text-gray-400 hover:text-white transition"
+                            >
+                                {selectedPapers.size === papers.length && papers.length > 0 ? '取消全选' : '全选'}
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBatchDelete}
+                                disabled={selectedPapers.size === 0 || batchLoading}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                🗑️ 删除
+                            </button>
+                            <button
+                                onClick={openGroupModal}
+                                disabled={selectedPapers.size === 0 || batchLoading}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                📁 分组
+                            </button>
+                            <button
+                                onClick={openExportModal}
+                                disabled={selectedPapers.size === 0 || batchLoading}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                📤 导出
+                            </button>
+                            <button
+                                onClick={exitSelectionMode}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* 论文列表 */}
                 {papers.length === 0 ? (
@@ -328,11 +519,31 @@ export default function PapersPage() {
                 ) : (
                     <div className="space-y-4">
                         {papers.map(paper => (
-                            <div key={paper.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                            <div
+                                key={paper.id}
+                                className={`bg-slate-800 border rounded-xl overflow-hidden transition ${selectionMode && selectedPapers.has(paper.id)
+                                        ? 'border-purple-500 ring-2 ring-purple-500/30'
+                                        : 'border-slate-700'
+                                    }`}
+                            >
                                 {/* 论文卡片 */}
                                 <div className="p-4">
                                     <div className="flex justify-between items-start">
-                                        <div className="flex-1">
+                                        {/* 多选模式下显示复选框 */}
+                                        {selectionMode && (
+                                            <div className="mr-4 flex items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedPapers.has(paper.id)}
+                                                    onChange={() => toggleSelection(paper.id)}
+                                                    className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-slate-800 cursor-pointer"
+                                                />
+                                            </div>
+                                        )}
+                                        <div
+                                            className="flex-1 cursor-pointer"
+                                            onClick={() => selectionMode && toggleSelection(paper.id)}
+                                        >
                                             <h3 className="text-lg font-semibold text-white">{paper.title}</h3>
                                             {paper.title_cn && <p className="text-gray-400 text-sm mt-1">{paper.title_cn}</p>}
                                             <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
@@ -341,32 +552,53 @@ export default function PapersPage() {
                                                 <span>✍️ {paper.authors?.slice(0, 50)}...</span>
                                             </div>
                                             {/* 分组标签 */}
-                                            <div className="flex flex-wrap gap-2 mt-3">
-                                                {groups.map(g => (
-                                                    <button
-                                                        key={g.id}
-                                                        onClick={() => handleGroupToggle(paper.id, g.name, paper.groups)}
-                                                        className={`px-2 py-1 text-xs rounded-full transition ${paper.groups.some(pg => pg.name === g.name) ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-400 hover:bg-slate-600'}`}
-                                                    >
-                                                        {g.name}
-                                                    </button>
-                                                ))}
+                                            {!selectionMode && (
+                                                <div className="flex flex-wrap gap-2 mt-3">
+                                                    {groups.map(g => (
+                                                        <button
+                                                            key={g.id}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleGroupToggle(paper.id, g.name, paper.groups);
+                                                            }}
+                                                            className={`px-2 py-1 text-xs rounded-full transition ${paper.groups.some(pg => pg.name === g.name) ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-400 hover:bg-slate-600'}`}
+                                                        >
+                                                            {g.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {/* 多选模式下显示已有分组标签（只读） */}
+                                            {selectionMode && paper.groups.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mt-3">
+                                                    {paper.groups.map(g => (
+                                                        <span
+                                                            key={g.id}
+                                                            className="px-2 py-1 text-xs rounded-full bg-purple-600/50 text-purple-200"
+                                                        >
+                                                            {g.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* 非多选模式下显示操作按钮 */}
+                                        {!selectionMode && (
+                                            <div className="flex gap-2 ml-4">
+                                                <button
+                                                    onClick={() => setExpandedPaper(expandedPaper === paper.id ? null : paper.id)}
+                                                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                                                >
+                                                    {expandedPaper === paper.id ? '收起' : '📖 阅读'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(paper.id)}
+                                                    className="px-3 py-1 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30"
+                                                >
+                                                    🗑️
+                                                </button>
                                             </div>
-                                        </div>
-                                        <div className="flex gap-2 ml-4">
-                                            <button
-                                                onClick={() => setExpandedPaper(expandedPaper === paper.id ? null : paper.id)}
-                                                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-                                            >
-                                                {expandedPaper === paper.id ? '收起' : '📖 阅读'}
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(paper.id)}
-                                                className="px-3 py-1 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30"
-                                            >
-                                                🗑️
-                                            </button>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -432,6 +664,184 @@ export default function PapersPage() {
                     </div>
                 )}
             </main>
+
+            {/* 批量分组弹窗 */}
+            {showGroupModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4">
+                        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-white">📁 批量分组</h3>
+                            <button
+                                onClick={() => setShowGroupModal(false)}
+                                className="text-gray-400 hover:text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <p className="text-gray-400">
+                                已选择 <span className="text-purple-400 font-semibold">{selectedPapers.size}</span> 篇论文
+                            </p>
+
+                            {/* 操作类型选择 */}
+                            <div className="space-y-2">
+                                <p className="text-sm text-gray-500">选择操作:</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setBatchGroupAction('add')}
+                                        className={`flex-1 px-3 py-2 rounded-lg text-sm transition ${batchGroupAction === 'add'
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                            }`}
+                                    >
+                                        添加到分组
+                                    </button>
+                                    <button
+                                        onClick={() => setBatchGroupAction('remove')}
+                                        className={`flex-1 px-3 py-2 rounded-lg text-sm transition ${batchGroupAction === 'remove'
+                                                ? 'bg-orange-600 text-white'
+                                                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                            }`}
+                                    >
+                                        从分组移除
+                                    </button>
+                                    <button
+                                        onClick={() => setBatchGroupAction('set')}
+                                        className={`flex-1 px-3 py-2 rounded-lg text-sm transition ${batchGroupAction === 'set'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                            }`}
+                                    >
+                                        设为指定
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 分组选择 */}
+                            <div className="space-y-2">
+                                <p className="text-sm text-gray-500">选择分组:</p>
+                                {groups.length === 0 ? (
+                                    <p className="text-gray-500 text-sm">暂无分组，请先创建分组</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {groups.map(g => (
+                                            <label
+                                                key={g.id}
+                                                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${batchSelectedGroups.has(g.name)
+                                                        ? 'bg-purple-600/30 border border-purple-500'
+                                                        : 'bg-slate-700 border border-transparent hover:bg-slate-600'
+                                                    }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={batchSelectedGroups.has(g.name)}
+                                                    onChange={() => toggleBatchGroupSelection(g.name)}
+                                                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-purple-600 focus:ring-purple-500"
+                                                />
+                                                <span className="text-white">{g.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-700 flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowGroupModal(false)}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleBatchGroup}
+                                disabled={batchSelectedGroups.size === 0 || batchLoading}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                {batchLoading ? '处理中...' : '确认'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 批量导出弹窗 */}
+            {showExportModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4">
+                        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-white">📤 批量导出</h3>
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="text-gray-400 hover:text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <p className="text-gray-400">
+                                已选择 <span className="text-purple-400 font-semibold">{selectedPapers.size}</span> 篇论文
+                            </p>
+
+                            {/* 导出格式选择 */}
+                            <div className="space-y-2">
+                                <p className="text-sm text-gray-500">选择导出格式:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => handleBatchExport('csv')}
+                                        disabled={batchLoading}
+                                        className="p-4 bg-slate-700 rounded-lg hover:bg-slate-600 transition text-left disabled:opacity-50"
+                                    >
+                                        <div className="text-2xl mb-1">📊</div>
+                                        <div className="text-white font-medium">CSV</div>
+                                        <div className="text-xs text-gray-400">元数据表格</div>
+                                    </button>
+                                    <button
+                                        onClick={() => handleBatchExport('bibtex')}
+                                        disabled={batchLoading}
+                                        className="p-4 bg-slate-700 rounded-lg hover:bg-slate-600 transition text-left disabled:opacity-50"
+                                    >
+                                        <div className="text-2xl mb-1">📚</div>
+                                        <div className="text-white font-medium">BibTeX</div>
+                                        <div className="text-xs text-gray-400">引用格式</div>
+                                    </button>
+                                    <button
+                                        onClick={() => handleBatchExport('markdown')}
+                                        disabled={batchLoading}
+                                        className="p-4 bg-slate-700 rounded-lg hover:bg-slate-600 transition text-left disabled:opacity-50"
+                                    >
+                                        <div className="text-2xl mb-1">📝</div>
+                                        <div className="text-white font-medium">Markdown</div>
+                                        <div className="text-xs text-gray-400">分析报告</div>
+                                    </button>
+                                    <button
+                                        onClick={() => handleBatchExport('json')}
+                                        disabled={batchLoading}
+                                        className="p-4 bg-slate-700 rounded-lg hover:bg-slate-600 transition text-left disabled:opacity-50"
+                                    >
+                                        <div className="text-2xl mb-1">🔧</div>
+                                        <div className="text-white font-medium">JSON</div>
+                                        <div className="text-xs text-gray-400">完整数据</div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {batchLoading && (
+                                <div className="text-center text-purple-400">
+                                    正在导出...
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-slate-700 flex justify-end">
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                            >
+                                关闭
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -118,12 +118,26 @@ Thumbs.db
 logs/
 temp/
 papers.db
+papers.db-journal
 llm_config.json
 !llm_config.json.example
 !.env.example
+
+# Uploaded files
+uploads/
+*.pdf
 
 # User Exclusions
 .spec-workflow/
 IFLOW.md
 *.bat
 tests/
+
+# OS generated files
+*.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini

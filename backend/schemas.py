@@ -129,3 +129,30 @@ class UpdateLLMProviderRequest(BaseModel):
 class SystemConfigRequest(BaseModel):
     key: str
     value: str
+
+
+# ================= Batch Operations =================
+class BatchDeleteRequest(BaseModel):
+    paper_ids: list[int]
+
+
+class BatchDeleteResponse(BaseModel):
+    message: str
+    deleted_count: int
+    failed_ids: list[int] = []
+
+
+class BatchGroupRequest(BaseModel):
+    paper_ids: list[int]
+    action: str  # add, remove, set
+    groups: list[str]
+
+
+class BatchGroupResponse(BaseModel):
+    message: str
+    updated_count: int
+
+
+class BatchExportRequest(BaseModel):
+    paper_ids: list[int]
+    format: str  # csv, bibtex, markdown, json

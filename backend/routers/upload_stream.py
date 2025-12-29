@@ -83,9 +83,9 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
                 yield {"step": 3, "total": 4, "message": f"语义重复: {title[:30]}...", "status": "error"}
                 return
         
-        # 步骤 4: 深度分析
-        yield {"step": 4, "total": 4, "message": "深度分析 (调用 LLM)...", "status": "processing"}
-        analysis = await task_analyze_paper(full_text)
+        # 步骤 4: 深度分析 - 使用流式响应以提高稳定性
+        yield {"step": 4, "total": 4, "message": "深度分析 (调用 LLM, 流式模式)...", "status": "processing"}
+        analysis = await task_analyze_paper(full_text, use_stream=True)
         
         # 写入数据库
         yield {"step": 4, "total": 4, "message": "写入数据库...", "status": "processing"}
@@ -106,8 +106,15 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
         
         yield {"step": 4, "total": 4, "message": f"处理完成: {title[:30]}...", "status": "success"}
         
+    except TimeoutError as e:
+        yield {"step": 0, "total": 4, "message": f"请求超时: {str(e)[:80]}", "status": "error"}
     except Exception as e:
-        yield {"step": 0, "total": 4, "message": f"处理失败: {str(e)[:50]}", "status": "error"}
+        error_msg = str(e)
+        # 提供更详细的错误信息
+        if "timeout" in error_msg.lower():
+            yield {"step": 0, "total": 4, "message": f"请求超时: {error_msg[:80]}", "status": "error"}
+        else:
+            yield {"step": 0, "total": 4, "message": f"处理失败: {error_msg[:80]}", "status": "error"}
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)

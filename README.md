@@ -154,11 +154,12 @@ PaperFlow/
 
 ## 🛠️ 技术栈
 
-- **前端**：Next.js 16 + React 19 + TailwindCSS 4
-- **后端**：FastAPI + SQLModel/SQLAlchemy
+- **前端**：Next.js 16.1 + React 19.2 + TailwindCSS 4
+- **后端**：FastAPI + SQLAlchemy
 - **数据库**：SQLite (Dev) / PostgreSQL (Prod)
-- **AI 集成**：OpenAI SDK (支持 OpenAI, Gemini, Claude, DeepSeek 等)
+- **AI 集成**：OpenAI SDK (支持 OpenAI, Gemini, Claude, DeepSeek 等兼容 API)
 - **PDF 解析**：PyMuPDF (fitz)
+- **Markdown 渲染**：react-markdown + KaTeX (数学公式) + highlight.js (代码高亮)
 
 ## 📝 使用流程
 

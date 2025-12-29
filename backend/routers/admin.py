@@ -1,6 +1,8 @@
 """
 管理员路由 - 系统管理功能
 """
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -12,12 +14,30 @@ from llm_pool import llm_manager
 
 from deps import get_db, get_current_admin
 from schemas import (
-    DbStatsResponse, LLMProviderResponse, 
+    DbStatsResponse, LLMProviderResponse,
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
     SystemConfigRequest, UserResponse
 )
 
 router = APIRouter(prefix="/api/admin", tags=["管理"])
+
+# 创建线程池用于后台任务
+_executor = ThreadPoolExecutor(max_workers=2)
+_logger = logging.getLogger(__name__)
+
+
+def _reload_config_background():
+    """后台线程中执行配置重载"""
+    try:
+        llm_manager.reload_config()
+        _logger.info("✅ LLM 配置后台重载成功")
+    except Exception as e:
+        _logger.error(f"❌ 后台重载 LLM 配置失败: {e}")
+
+
+def trigger_reload_async():
+    """触发异步重载（非阻塞）"""
+    _executor.submit(_reload_config_background)
 
 
 # ================= 系统概览 =================
@@ -51,8 +71,11 @@ async def get_llm_providers(
     current_user: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
-    """获取 LLM 提供商列表，按优先级排序"""
-    query = db.query(LLMProvider).order_by(LLMProvider.priority.asc())
+    """获取 LLM 提供商列表，主模型优先，然后按优先级排序"""
+    query = db.query(LLMProvider).order_by(
+        LLMProvider.is_primary.desc(),  # 主模型优先
+        LLMProvider.priority.asc()       # 然后按优先级排序
+    )
     if pool_type:
         query = query.filter(LLMProvider.pool_type == pool_type)
     
@@ -104,7 +127,7 @@ async def create_llm_provider(
     db.add(provider)
     db.commit()
     db.refresh(provider)
-    llm_manager.reload_config()  # 刷新内存配置
+    trigger_reload_async()  # 异步刷新内存配置（非阻塞）
     
     return LLMProviderResponse(
         id=provider.id,
@@ -141,7 +164,7 @@ async def update_llm_provider(
     
     db.commit()
     db.refresh(provider)
-    llm_manager.reload_config()  # 刷新内存配置
+    trigger_reload_async()  # 异步刷新内存配置（非阻塞）
     
     return LLMProviderResponse(
         id=provider.id,
@@ -171,7 +194,7 @@ async def delete_llm_provider(
     
     db.delete(provider)
     db.commit()
-    llm_manager.reload_config()  # 刷新内存配置
+    trigger_reload_async()  # 异步刷新内存配置（非阻塞）
     return {"message": "删除成功"}
 
 
@@ -194,7 +217,7 @@ async def set_primary(
     
     provider.is_primary = True
     db.commit()
-    llm_manager.reload_config()  # 刷新内存配置
+    trigger_reload_async()  # 异步刷新内存配置（非阻塞）
     return {"message": "设置成功"}
 
 
@@ -211,7 +234,7 @@ async def toggle_enabled(
     
     provider.enabled = not provider.enabled
     db.commit()
-    llm_manager.reload_config()  # 刷新内存配置
+    trigger_reload_async()  # 异步刷新内存配置（非阻塞）
     return {"message": "切换成功", "enabled": provider.enabled}
 
 

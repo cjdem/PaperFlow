@@ -88,20 +88,16 @@ async def task_extract_metadata(text):
         logger.error(f"Metadata 任务失败: {e}")
         raise e
 
-async def task_analyze_paper(full_text):
-    if not full_text: return "无内容"
-    logger.info("请求深度分析 (Pool: Analysis)")
+def _get_analysis_prompts(input_text: str) -> tuple[str, str]:
+    """
+    获取深度分析的 system prompt 和 user prompt
     
-    input_text = full_text
-
-    def validate_analysis(content):
-        if len(content) < 100: return False
-        bad_words = ["Bad Gateway", "upstream connect error", "Service Unavailable", "<html>"]
-        for w in bad_words:
-            if w.lower() in content.lower(): return False
-        return True
-
-    # 1. 定义 System Prompt (身份设定)
+    Args:
+        input_text: 论文全文
+    
+    Returns:
+        (system_prompt, user_prompt) 元组
+    """
     system_prompt = """
     你是一位严谨的学术研究员。请根据用户提供的论文全文，撰写一份【全面、系统、批判性】的分析报告。
     【核心原则】：
@@ -111,8 +107,6 @@ async def task_analyze_paper(full_text):
     4. **中文报告**：报告必须是中文，除必要的英文描述外，其他内容均需用中文。
     """
 
-    # 2. 定义 User Prompt (具体任务 + 输入内容)
-    # 注意这里使用了 f-string 将 input_text 嵌入进去
     user_prompt = f"""
     请阅读以下论文内容，并按照下方的 <OUTPUT_TEMPLATE> 生成报告。
 
@@ -192,19 +186,82 @@ async def task_analyze_paper(full_text):
     【论文全文输入】：
     {input_text}
     """
+    
+    return system_prompt, user_prompt
+
+
+def _validate_analysis(content: str) -> bool:
+    """验证分析内容是否有效"""
+    if len(content) < 100:
+        return False
+    bad_words = ["Bad Gateway", "upstream connect error", "Service Unavailable", "<html>"]
+    for w in bad_words:
+        if w.lower() in content.lower():
+            return False
+    return True
+
+
+async def task_analyze_paper(full_text, timeout_seconds: float = 300.0, use_stream: bool = False):
+    """
+    深度分析论文内容
+    
+    Args:
+        full_text: 论文全文
+        timeout_seconds: 超时时间（秒），默认5分钟
+        use_stream: 是否使用流式响应，默认 False
+    
+    Returns:
+        分析报告内容
+    
+    Raises:
+        TimeoutError: LLM 请求超时
+        Exception: 其他错误
+    """
+    if not full_text: return "无内容"
+    logger.info(f"请求深度分析 (Pool: Analysis, 超时: {timeout_seconds}秒, 流式: {use_stream})")
+    
+    system_prompt, user_prompt = _get_analysis_prompts(full_text)
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = await llm_manager.chat(
-            pool_name="analysis",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.2,
-            validator=validate_analysis
-        )
-        logger.info("详细报告生成成功")
-        return response.choices[0].message.content
+        if use_stream:
+            # 使用流式响应 - 更稳定，可以更早发现问题
+            logger.info("使用流式响应模式")
+            content = await asyncio.wait_for(
+                llm_manager.chat_stream(
+                    pool_name="analysis",
+                    messages=messages,
+                    temperature=0.2
+                ),
+                timeout=timeout_seconds
+            )
+            
+            # 验证内容
+            if not _validate_analysis(content):
+                raise ValueError(f"内容质检未通过: {content[:50]}...")
+            
+            logger.info("详细报告生成成功 (流式)")
+            return content
+        else:
+            # 使用普通响应
+            response = await asyncio.wait_for(
+                llm_manager.chat(
+                    pool_name="analysis",
+                    messages=messages,
+                    temperature=0.2,
+                    validator=_validate_analysis
+                ),
+                timeout=timeout_seconds
+            )
+            logger.info("详细报告生成成功")
+            return response.choices[0].message.content
+            
+    except asyncio.TimeoutError:
+        logger.error(f"Analysis 任务超时 (超过 {timeout_seconds} 秒)")
+        raise TimeoutError(f"LLM 深度分析请求超时（超过 {timeout_seconds} 秒），请检查网络连接或稍后重试")
     except Exception as e:
         logger.error(f"Analysis 任务失败: {e}")
         raise e
