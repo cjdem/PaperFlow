@@ -197,7 +197,7 @@ async def delete_paper(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """删除论文（同时删除物理文件）"""
+    """删除论文（同时删除物理文件和翻译文件）"""
     paper = db.query(Paper).filter(Paper.id == paper_id).first()
     
     if not paper:
@@ -207,11 +207,17 @@ async def delete_paper(
     if current_user.role != "admin" and paper.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权删除此论文")
     
-    # 删除物理文件
+    # 删除原始 PDF 文件
     if paper.file_path:
         file_service.delete_file_by_path(paper.file_path)
     elif paper.md5_hash and paper.owner_id:
         file_service.delete_file(paper.owner_id, paper.md5_hash)
+    
+    # 删除翻译后的 PDF 文件（中文版和双语对照版）
+    if paper.translated_file_path:
+        file_service.delete_file_by_absolute_path(paper.translated_file_path)
+    if paper.translated_dual_path:
+        file_service.delete_file_by_absolute_path(paper.translated_dual_path)
     
     db.delete(paper)
     db.commit()
@@ -332,7 +338,7 @@ async def batch_delete_papers(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """批量删除论文（同时删除物理文件）"""
+    """批量删除论文（同时删除物理文件和翻译文件）"""
     deleted_count = 0
     failed_ids = []
     
@@ -347,11 +353,17 @@ async def batch_delete_papers(
             failed_ids.append(paper_id)
             continue
         
-        # 删除物理文件
+        # 删除原始 PDF 文件
         if paper.file_path:
             file_service.delete_file_by_path(paper.file_path)
         elif paper.md5_hash and paper.owner_id:
             file_service.delete_file(paper.owner_id, paper.md5_hash)
+        
+        # 删除翻译后的 PDF 文件（中文版和双语对照版）
+        if paper.translated_file_path:
+            file_service.delete_file_by_absolute_path(paper.translated_file_path)
+        if paper.translated_dual_path:
+            file_service.delete_file_by_absolute_path(paper.translated_dual_path)
         
         db.delete(paper)
         deleted_count += 1

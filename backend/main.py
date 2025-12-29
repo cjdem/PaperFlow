@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from backend.routers import auth, papers, groups, upload, admin, upload_stream, export, workspaces
+from backend.routers import auth, papers, groups, upload, admin, upload_stream, export, workspaces, translate
 
 load_dotenv()
 
@@ -45,6 +45,7 @@ app.include_router(upload_stream.router)
 app.include_router(admin.router)
 app.include_router(export.router)
 app.include_router(workspaces.router)
+app.include_router(translate.router)
 
 
 # ================= 根路由 =================

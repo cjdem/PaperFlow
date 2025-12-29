@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import AdvancedSearch, { SearchParams } from '@/components/AdvancedSearch';
+import TranslationPanel from '@/components/TranslationPanel';
 
 
 export default function PapersPage() {
@@ -24,7 +25,7 @@ export default function PapersPage() {
     const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
     const [uploadLogs, setUploadLogs] = useState<(UploadProgress & { time: string })[]>([]);
     const [expandedPaper, setExpandedPaper] = useState<number | null>(null);
-    const [detailTab, setDetailTab] = useState<'analysis' | 'abstract_cn' | 'abstract_en'>('analysis');
+    const [detailTab, setDetailTab] = useState<'analysis' | 'abstract_cn' | 'abstract_en' | 'translate'>('analysis');
     const [newGroupName, setNewGroupName] = useState('');
 
     // 高级搜索状态
@@ -773,6 +774,17 @@ export default function PapersPage() {
                                             >
                                                 🇬🇧 英文摘要
                                             </button>
+                                            {paper.has_file && (
+                                                <button
+                                                    onClick={() => setDetailTab('translate')}
+                                                    className={`px-6 py-3 font-medium transition-all ${detailTab === 'translate'
+                                                        ? 'text-orange-400 border-b-2 border-orange-400 bg-slate-800'
+                                                        : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800'
+                                                        }`}
+                                                >
+                                                    🌐 PDF翻译
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* 标签页内容 */}
@@ -794,6 +806,15 @@ export default function PapersPage() {
                                                 <div className="text-gray-200 text-lg leading-9 font-serif italic">
                                                     {paper.abstract_en || 'No English abstract available'}
                                                 </div>
+                                            )}
+
+                                            {/* PDF翻译 */}
+                                            {detailTab === 'translate' && paper.has_file && (
+                                                <TranslationPanel
+                                                    paperId={paper.id}
+                                                    paperTitle={paper.title}
+                                                    hasFile={paper.has_file}
+                                                />
                                             )}
                                         </div>
                                     </div>

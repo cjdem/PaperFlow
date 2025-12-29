@@ -313,3 +313,66 @@ class WorkspacePaperListResponse(BaseModel):
 class UpdateMemberRoleRequest(BaseModel):
     """更新成员角色请求"""
     role: str  # admin, member
+
+
+# ================= Translation（翻译）=================
+class TranslateRequest(BaseModel):
+    """翻译请求"""
+    provider_id: Optional[int] = None  # 指定翻译提供商 ID
+    priority: Optional[int] = 100      # 任务优先级
+
+
+class BatchTranslateRequest(BaseModel):
+    """批量翻译请求"""
+    paper_ids: list[int]
+    provider_id: Optional[int] = None
+    priority: Optional[int] = 100
+
+
+class TranslateStatusResponse(BaseModel):
+    """翻译状态响应"""
+    paper_id: int
+    status: Optional[str] = None
+    progress: int = 0
+    error: Optional[str] = None
+    translated_file_path: Optional[str] = None
+    translated_dual_path: Optional[str] = None
+    translated_at: Optional[str] = None
+
+
+class TranslationQueueStats(BaseModel):
+    """翻译队列统计"""
+    pending: int
+    processing: int
+    completed: int
+    failed: int
+    untranslated_papers: int
+    is_running: bool
+
+
+class TranslationProviderCreate(BaseModel):
+    """创建/更新翻译提供商"""
+    name: str
+    engine_type: str  # openai, deepseek, google, deepl, ollama, gemini, azure
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    priority: int = 100
+    qps: int = 4
+    enabled: bool = True
+
+
+class TranslationProviderResponse(BaseModel):
+    """翻译提供商响应"""
+    id: int
+    name: str
+    engine_type: str
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    priority: int
+    qps: int
+    enabled: bool
+    created_at: str
+
+    class Config:
+        from_attributes = True

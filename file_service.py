@@ -161,6 +161,31 @@ class FileService:
             logger.warning(f"文件不存在，无需删除: {relative_path}")
             return True
     
+    def delete_file_by_absolute_path(self, absolute_path: str) -> bool:
+        """
+        根据绝对路径删除文件
+        
+        Args:
+            absolute_path: 文件的绝对路径
+        
+        Returns:
+            bool: 删除是否成功
+        """
+        if not absolute_path:
+            return True
+        
+        if os.path.exists(absolute_path):
+            try:
+                os.remove(absolute_path)
+                logger.info(f"文件删除成功: {absolute_path}")
+                return True
+            except Exception as e:
+                logger.error(f"文件删除失败: {e}")
+                return False
+        else:
+            logger.warning(f"文件不存在，无需删除: {absolute_path}")
+            return True
+    
     def file_exists(self, user_id: int, md5_hash: str) -> bool:
         """
         检查用户的文件是否存在

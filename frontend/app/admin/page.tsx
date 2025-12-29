@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMe, logout, User } from '@/lib/api';
+import TranslationMonitor from '@/components/TranslationMonitor';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -95,7 +96,7 @@ export default function AdminPage() {
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
     const [providers, setProviders] = useState<LLMProvider[]>([]);
-    const [activeTab, setActiveTab] = useState<'stats' | 'storage' | 'llm'>('stats');
+    const [activeTab, setActiveTab] = useState<'stats' | 'storage' | 'llm' | 'translate'>('stats');
     const [activePoolTab, setActivePoolTab] = useState<'metadata' | 'analysis'>('metadata');
     const [editingProvider, setEditingProvider] = useState<LLMProvider | null>(null);
     const [isAdding, setIsAdding] = useState(false);
@@ -508,6 +509,9 @@ export default function AdminPage() {
                     <button onClick={() => setActiveTab('llm')} className={`px-4 py-2 rounded-lg font-medium transition ${activeTab === 'llm' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>
                         🤖 LLM 提供商
                     </button>
+                    <button onClick={() => setActiveTab('translate')} className={`px-4 py-2 rounded-lg font-medium transition ${activeTab === 'translate' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>
+                        🌐 翻译配置
+                    </button>
                 </div>
 
                 {/* Stats Tab */}
@@ -733,6 +737,11 @@ export default function AdminPage() {
                             </ul>
                         </div>
                     </div>
+                )}
+
+                {/* Translation Tab */}
+                {activeTab === 'translate' && (
+                    <TranslationMonitor />
                 )}
             </div>
         </div>

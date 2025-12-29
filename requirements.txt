@@ -1,8 +1,11 @@
-openai           
-pymupdf            
-sqlalchemy         
-pydantic           
-python-dotenv      
+openai
+pymupdf
+sqlalchemy
+pydantic
+python-dotenv
 json_repair
 psycopg2-binary
 streamlit
+
+# PDF 翻译功能
+pdf2zh-next

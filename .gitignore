@@ -133,6 +133,9 @@ IFLOW.md
 *.bat
 tests/
 
+# PDFMathTranslate source code (installed via pip)
+PDFMathTranslate-next-main/
+
 # OS generated files
 *.DS_Store
 .DS_Store?
