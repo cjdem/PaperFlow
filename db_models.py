@@ -29,6 +29,12 @@ class Paper(Base):
     detailed_analysis = Column(Text, nullable=True)
     md5_hash = Column(String(32))
     owner_id = Column(Integer, ForeignKey("users.id"))
+    
+    # 文件存储相关字段
+    file_path = Column(String(500), nullable=True)      # 文件相对路径
+    file_size = Column(Integer, nullable=True)          # 文件大小（字节）
+    original_filename = Column(String(255), nullable=True)  # 原始文件名
+    uploaded_at = Column(String(50), nullable=True)     # 上传时间
 
     owner = relationship("User", back_populates="papers")
     groups = relationship("Group", secondary=paper_group, back_populates="papers")

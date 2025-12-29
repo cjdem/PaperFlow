@@ -268,9 +268,15 @@ async def task_analyze_paper(full_text, timeout_seconds: float = 300.0, use_stre
 
 # ================= 核心编排 =================
 
-async def process_workflow(pdf_path, file_md5=None, owner_id=None):
+async def process_workflow(pdf_path, file_md5=None, owner_id=None, file_info=None):
     """
-    owner_id: 当前上传用户的 ID
+    处理 PDF 文件的完整工作流
+    
+    Args:
+        pdf_path: PDF 文件路径
+        file_md5: 文件 MD5 哈希值
+        owner_id: 当前上传用户的 ID
+        file_info: 文件存储信息（可选），包含 file_path, file_size, original_filename, uploaded_at
     """
     # 1. 解析 PDF
     workflow_logger.log_start(pdf_path)
@@ -284,13 +290,18 @@ async def process_workflow(pdf_path, file_md5=None, owner_id=None):
     if not metadata or not metadata.get('title'):
         raise ValueError("元数据提取失败，无法查重")
 
-    # === 🛑 语义查重 ===
+    # === 🛑 语义查重（用户范围内）===
     current_title = metadata.get('title')
     normalized_current = normalize_title(current_title)
     
     session = DBSession()
     try:
-        existing_papers = session.query(Paper.title).all()
+        # 只查询当前用户的论文进行语义去重
+        if owner_id:
+            existing_papers = session.query(Paper.title).filter(Paper.owner_id == owner_id).all()
+        else:
+            existing_papers = session.query(Paper.title).all()
+        
         for (db_title,) in existing_papers:
             if normalize_title(db_title) == normalized_current:
                 workflow_logger.log_skip(pdf_path, f"语义重复: {current_title}")
@@ -304,7 +315,7 @@ async def process_workflow(pdf_path, file_md5=None, owner_id=None):
     workflow_logger.log_step(2, 4, "深度分析")
     analysis = await task_analyze_paper(full_text)
 
-    # 4. 入库 (关联 Owner)
+    # 4. 入库 (关联 Owner 和文件信息)
     workflow_logger.log_step(3, 4, "写入数据库")
     session = DBSession()
     try:
@@ -318,11 +329,78 @@ async def process_workflow(pdf_path, file_md5=None, owner_id=None):
             abstract_en=metadata.get('abstract_en'),
             abstract=metadata.get('abstract'),
             detailed_analysis=analysis,
-            owner_id=owner_id  # <--- 这里关联用户
+            owner_id=owner_id,
+            # 文件存储信息
+            file_path=file_info.get('file_path') if file_info else None,
+            file_size=file_info.get('file_size') if file_info else None,
+            original_filename=file_info.get('original_filename') if file_info else None,
+            uploaded_at=file_info.get('uploaded_at') if file_info else None
         )
         session.add(new_paper)
         session.commit()
         workflow_logger.log_complete(pdf_path, metadata.get('title', ''))
+        
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
+
+async def reanalyze_paper(paper_id: int, owner_id: int = None):
+    """
+    重新分析已存储的论文
+    
+    Args:
+        paper_id: 论文 ID
+        owner_id: 当前用户 ID（用于权限检查）
+    
+    Returns:
+        更新后的分析结果
+    
+    Raises:
+        ValueError: 论文不存在或无权限
+        FileNotFoundError: PDF 文件不存在
+    """
+    from file_service import file_service
+    
+    session = DBSession()
+    try:
+        paper = session.query(Paper).filter(Paper.id == paper_id).first()
+        
+        if not paper:
+            raise ValueError("论文不存在")
+        
+        # 权限检查（如果提供了 owner_id）
+        if owner_id and paper.owner_id != owner_id:
+            raise ValueError("无权重新分析此论文")
+        
+        # 获取 PDF 文件路径
+        file_path = None
+        if paper.file_path:
+            file_path = file_service.get_file_path_by_relative(paper.file_path)
+        elif paper.md5_hash and paper.owner_id:
+            file_path = file_service.get_file_path(paper.owner_id, paper.md5_hash)
+        
+        if not file_path or not os.path.exists(file_path):
+            raise FileNotFoundError("PDF 文件不存在，无法重新分析")
+        
+        # 重新提取 PDF 内容
+        logger.info(f"开始重新分析论文: {paper.title}")
+        head_text, full_text = extract_pdf_content(file_path)
+        
+        if not full_text:
+            raise ValueError("PDF 内容提取失败")
+        
+        # 重新进行深度分析
+        analysis = await task_analyze_paper(full_text)
+        
+        # 更新数据库
+        paper.detailed_analysis = analysis
+        session.commit()
+        
+        logger.info(f"论文重新分析完成: {paper.title}")
+        return analysis
         
     except Exception as e:
         session.rollback()

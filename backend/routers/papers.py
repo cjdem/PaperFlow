@@ -1,15 +1,21 @@
 """
 论文路由 - 论文的 CRUD 操作
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+import re
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import Optional, List
+from urllib.parse import quote
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import Paper, Group, User
+from file_service import file_service
+# 注意：reanalyze_paper 使用延迟导入以避免循环导入
 
 from deps import get_db, get_current_user
 from schemas import (
@@ -21,8 +27,24 @@ from schemas import (
 router = APIRouter(prefix="/api/papers", tags=["论文"])
 
 
+def sanitize_filename(filename: str) -> str:
+    """清理文件名，移除不安全字符"""
+    # 移除或替换不安全的文件名字符
+    filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    # 限制长度
+    if len(filename) > 200:
+        filename = filename[:200]
+    return filename
+
+
 def paper_to_response(paper: Paper) -> PaperResponse:
     """将 Paper ORM 对象转换为响应模型"""
+    # 判断是否有关联文件
+    has_file = bool(paper.file_path) or (
+        paper.md5_hash and paper.owner_id and
+        file_service.file_exists(paper.owner_id, paper.md5_hash)
+    )
+    
     return PaperResponse(
         id=paper.id,
         title=paper.title,
@@ -34,7 +56,13 @@ def paper_to_response(paper: Paper) -> PaperResponse:
         abstract_en=paper.abstract_en,
         detailed_analysis=paper.detailed_analysis,
         groups=[GroupInfo(id=g.id, name=g.name) for g in paper.groups],
-        owner_username=paper.owner.username if paper.owner else None
+        owner_username=paper.owner.username if paper.owner else None,
+        # 文件相关字段
+        file_path=paper.file_path,
+        file_size=paper.file_size,
+        original_filename=paper.original_filename,
+        uploaded_at=paper.uploaded_at,
+        has_file=has_file
     )
 
 
@@ -169,7 +197,7 @@ async def delete_paper(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """删除论文"""
+    """删除论文（同时删除物理文件）"""
     paper = db.query(Paper).filter(Paper.id == paper_id).first()
     
     if not paper:
@@ -179,9 +207,96 @@ async def delete_paper(
     if current_user.role != "admin" and paper.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权删除此论文")
     
+    # 删除物理文件
+    if paper.file_path:
+        file_service.delete_file_by_path(paper.file_path)
+    elif paper.md5_hash and paper.owner_id:
+        file_service.delete_file(paper.owner_id, paper.md5_hash)
+    
     db.delete(paper)
     db.commit()
     return {"message": "删除成功"}
+
+
+@router.get("/{paper_id}/download")
+async def download_paper(
+    paper_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """下载论文 PDF 文件"""
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    
+    # 权限检查
+    if current_user.role != "admin" and paper.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权下载此论文")
+    
+    # 获取文件路径
+    file_path = None
+    if paper.file_path:
+        file_path = file_service.get_file_path_by_relative(paper.file_path)
+    elif paper.md5_hash and paper.owner_id:
+        file_path = file_service.get_file_path(paper.owner_id, paper.md5_hash)
+    
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    # 使用论文标题作为下载文件名
+    download_filename = sanitize_filename(paper.title or "paper") + ".pdf"
+    
+    # 对文件名进行 URL 编码以支持中文
+    encoded_filename = quote(download_filename)
+    
+    return FileResponse(
+        path=file_path,
+        filename=download_filename,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
+    )
+
+
+@router.get("/{paper_id}/preview")
+async def preview_paper(
+    paper_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """预览论文 PDF 文件（在浏览器中打开）"""
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    
+    # 权限检查
+    if current_user.role != "admin" and paper.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权预览此论文")
+    
+    # 获取文件路径
+    file_path = None
+    if paper.file_path:
+        file_path = file_service.get_file_path_by_relative(paper.file_path)
+    elif paper.md5_hash and paper.owner_id:
+        file_path = file_service.get_file_path(paper.owner_id, paper.md5_hash)
+    
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    # 使用论文标题作为文件名
+    preview_filename = sanitize_filename(paper.title or "paper") + ".pdf"
+    encoded_filename = quote(preview_filename)
+    
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
+        }
+    )
 
 
 @router.put("/{paper_id}/groups")
@@ -217,7 +332,7 @@ async def batch_delete_papers(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """批量删除论文"""
+    """批量删除论文（同时删除物理文件）"""
     deleted_count = 0
     failed_ids = []
     
@@ -231,6 +346,12 @@ async def batch_delete_papers(
         if current_user.role != "admin" and paper.owner_id != current_user.id:
             failed_ids.append(paper_id)
             continue
+        
+        # 删除物理文件
+        if paper.file_path:
+            file_service.delete_file_by_path(paper.file_path)
+        elif paper.md5_hash and paper.owner_id:
+            file_service.delete_file(paper.owner_id, paper.md5_hash)
         
         db.delete(paper)
         deleted_count += 1
@@ -281,3 +402,56 @@ async def batch_update_groups(
         message=f"成功更新 {updated_count} 篇论文的分组",
         updated_count=updated_count
     )
+
+
+# ================= 重新分析 API =================
+
+@router.post("/{paper_id}/reanalyze")
+async def reanalyze_paper_endpoint(
+    paper_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    重新分析论文（使用已存储的 PDF 文件）
+    
+    需要论文有关联的 PDF 文件才能重新分析
+    """
+    # 先检查论文是否存在
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    
+    # 权限检查
+    if current_user.role != "admin" and paper.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权重新分析此论文")
+    
+    # 检查是否有文件
+    has_file = bool(paper.file_path) or (
+        paper.md5_hash and paper.owner_id and
+        file_service.file_exists(paper.owner_id, paper.md5_hash)
+    )
+    
+    if not has_file:
+        raise HTTPException(status_code=400, detail="论文没有关联的 PDF 文件，无法重新分析")
+    
+    try:
+        # 延迟导入以避免循环导入
+        from main import reanalyze_paper
+        
+        # 执行重新分析（允许管理员分析任何论文）
+        owner_id = None if current_user.role == "admin" else current_user.id
+        analysis = await reanalyze_paper(paper_id, owner_id)
+        
+        return {
+            "message": "重新分析完成",
+            "paper_id": paper_id,
+            "analysis_preview": analysis[:500] + "..." if len(analysis) > 500 else analysis
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"重新分析失败: {str(e)}")

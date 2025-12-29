@@ -6,7 +6,8 @@ import {
     getMe, logout, getGroups, createGroup, deletePaper,
     uploadPapersWithProgress, User, Paper, Group, updatePaperGroups, UploadProgress,
     batchDeletePapers, batchUpdateGroups, batchExportPapers, downloadBlob,
-    getPapersAdvanced, getFilterOptions, FilterOptions
+    getPapersAdvanced, getFilterOptions, FilterOptions,
+    downloadPaper, previewPaper, reanalyzePaper
 } from '@/lib/api';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import AdvancedSearch, { SearchParams } from '@/components/AdvancedSearch';
@@ -45,6 +46,9 @@ export default function PapersPage() {
     const [batchGroupAction, setBatchGroupAction] = useState<'add' | 'remove' | 'set'>('add');
     const [batchSelectedGroups, setBatchSelectedGroups] = useState<Set<string>>(new Set());
     const [batchLoading, setBatchLoading] = useState(false);
+    
+    // 重新分析状态
+    const [reanalyzingPaperId, setReanalyzingPaperId] = useState<number | null>(null);
 
     // 加载筛选选项
     const loadFilterOptions = useCallback(async () => {
@@ -166,6 +170,59 @@ export default function PapersPage() {
             await loadData();
         } catch (err) {
             alert(err instanceof Error ? err.message : '删除失败');
+        }
+    };
+
+    // 下载论文 PDF
+    const handleDownload = async (paper: Paper) => {
+        try {
+            // 直接使用论文标题作为文件名
+            const filename = (paper.title || 'paper') + '.pdf';
+            
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/papers/${paper.id}/download`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ detail: '下载失败' }));
+                throw new Error(error.detail || '下载失败');
+            }
+            
+            const blob = await response.blob();
+            
+            // 创建下载链接
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '下载失败');
+        }
+    };
+
+    // 预览论文 PDF
+    const handlePreview = (paper: Paper) => {
+        previewPaper(paper.id);
+    };
+
+    // 重新分析论文
+    const handleReanalyze = async (paper: Paper) => {
+        if (!confirm(`确定要重新分析论文「${paper.title}」吗？这可能需要几分钟时间。`)) return;
+        
+        setReanalyzingPaperId(paper.id);
+        try {
+            await reanalyzePaper(paper.id);
+            alert('重新分析完成！');
+            await loadData();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '重新分析失败');
+        } finally {
+            setReanalyzingPaperId(null);
         }
     };
 
@@ -639,13 +696,40 @@ export default function PapersPage() {
                                         </div>
                                         {/* 非多选模式下显示操作按钮 */}
                                         {!selectionMode && (
-                                            <div className="flex gap-2 ml-4">
+                                            <div className="flex gap-2 ml-4 flex-wrap">
                                                 <button
                                                     onClick={() => setExpandedPaper(expandedPaper === paper.id ? null : paper.id)}
                                                     className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
                                                 >
                                                     {expandedPaper === paper.id ? '收起' : '📖 阅读'}
                                                 </button>
+                                                {/* 文件操作按钮 - 仅当有文件时显示 */}
+                                                {paper.has_file && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleDownload(paper)}
+                                                            className="px-3 py-1 bg-green-600/20 text-green-400 text-sm rounded-lg hover:bg-green-600/30"
+                                                            title="下载 PDF"
+                                                        >
+                                                            ⬇️ 下载
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handlePreview(paper)}
+                                                            className="px-3 py-1 bg-purple-600/20 text-purple-400 text-sm rounded-lg hover:bg-purple-600/30"
+                                                            title="预览 PDF"
+                                                        >
+                                                            👁️ 预览
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleReanalyze(paper)}
+                                                            disabled={reanalyzingPaperId === paper.id}
+                                                            className="px-3 py-1 bg-orange-600/20 text-orange-400 text-sm rounded-lg hover:bg-orange-600/30 disabled:opacity-50 disabled:cursor-wait"
+                                                            title="重新分析"
+                                                        >
+                                                            {reanalyzingPaperId === paper.id ? '⏳ 分析中...' : '🔄 重新分析'}
+                                                        </button>
+                                                    </>
+                                                )}
                                                 <button
                                                     onClick={() => handleDelete(paper.id)}
                                                     className="px-3 py-1 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30"

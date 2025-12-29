@@ -52,6 +52,12 @@ class PaperResponse(BaseModel):
     detailed_analysis: Optional[str] = None
     groups: list[GroupInfo] = []
     owner_username: Optional[str] = None
+    # 文件相关字段
+    file_path: Optional[str] = None
+    file_size: Optional[int] = None
+    original_filename: Optional[str] = None
+    uploaded_at: Optional[str] = None
+    has_file: bool = False  # 是否有关联文件
 
     class Config:
         from_attributes = True
@@ -97,6 +103,24 @@ class DbStatsResponse(BaseModel):
     user_count: int
     paper_count: int
     group_count: int
+
+
+# ================= Storage Stats =================
+class UserStorageStats(BaseModel):
+    """用户存储统计"""
+    user_id: int
+    username: str
+    file_count: int
+    total_size: int
+    total_size_formatted: str
+
+
+class StorageStatsResponse(BaseModel):
+    """存储统计响应"""
+    total_size: int
+    total_size_formatted: str
+    total_files: int
+    users: list[UserStorageStats]
 
 
 class LLMProviderResponse(BaseModel):

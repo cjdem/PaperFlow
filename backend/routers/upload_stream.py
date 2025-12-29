@@ -5,6 +5,7 @@ import os
 import sys
 import asyncio
 import hashlib
+from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -18,13 +19,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db_models import Paper, User
 from utils import calculate_md5
+from file_service import file_service
 
 from deps import get_db, get_current_user
 
 router = APIRouter(prefix="/api/upload-stream", tags=["上传流"])
 
 
-async def process_with_progress(file_content: bytes, filename: str, md5: str, owner_id: int, db: Session):
+async def process_with_progress(file_content: bytes, filename: str, md5: str, owner_id: int, db: Session, file_info: dict = None):
     """处理文件并 yield 进度更新"""
     import importlib.util
     
@@ -42,12 +44,10 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
     # 获取 llm_manager (已在 paper_main 中初始化)
     from llm_pool import llm_manager
     
-    # 步骤 1: 保存临时文件
-    yield {"step": 1, "total": 4, "message": "保存临时文件...", "status": "processing"}
+    # 步骤 1: 保存临时文件用于处理
+    yield {"step": 1, "total": 4, "message": "保存文件...", "status": "processing"}
     
-    temp_dir = os.path.join(root_dir, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, filename)
+    temp_path = file_service.get_temp_path(filename)
     
     with open(temp_path, "wb") as f:
         f.write(file_content)
@@ -75,9 +75,9 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
         title = metadata.get('title', filename)
         yield {"step": 3, "total": 4, "message": f"元数据提取成功: {title[:30]}...", "status": "processing"}
         
-        # 检查语义重复
+        # 检查语义重复（用户范围内）
         normalized_current = normalize_title(title)
-        existing_papers = db.query(Paper.title).all()
+        existing_papers = db.query(Paper.title).filter(Paper.owner_id == owner_id).all()
         for (db_title,) in existing_papers:
             if normalize_title(db_title) == normalized_current:
                 yield {"step": 3, "total": 4, "message": f"语义重复: {title[:30]}...", "status": "error"}
@@ -87,7 +87,7 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
         yield {"step": 4, "total": 4, "message": "深度分析 (调用 LLM, 流式模式)...", "status": "processing"}
         analysis = await task_analyze_paper(full_text, use_stream=True)
         
-        # 写入数据库
+        # 写入数据库（包含文件信息）
         yield {"step": 4, "total": 4, "message": "写入数据库...", "status": "processing"}
         new_paper = Paper(
             md5_hash=md5,
@@ -99,7 +99,12 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
             abstract_en=metadata.get('abstract_en'),
             abstract=metadata.get('abstract'),
             detailed_analysis=analysis,
-            owner_id=owner_id
+            owner_id=owner_id,
+            # 文件存储信息
+            file_path=file_info.get('file_path') if file_info else None,
+            file_size=file_info.get('file_size') if file_info else None,
+            original_filename=file_info.get('original_filename') if file_info else None,
+            uploaded_at=file_info.get('uploaded_at') if file_info else None
         )
         db.add(new_paper)
         db.commit()
@@ -116,8 +121,8 @@ async def process_with_progress(file_content: bytes, filename: str, md5: str, ow
         else:
             yield {"step": 0, "total": 4, "message": f"处理失败: {error_msg[:80]}", "status": "error"}
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        # 清理临时文件
+        file_service.cleanup_temp(filename)
 
 
 @router.post("")
@@ -145,16 +150,38 @@ async def upload_with_stream(
             content = await file.read()
             md5 = calculate_md5(content)
             
-            # 检查 MD5 重复
-            if db.query(Paper.id).filter(Paper.md5_hash == md5).first():
+            # 检查当前用户是否已有此 MD5 的文件（用户范围去重）
+            existing = db.query(Paper.id).filter(
+                Paper.md5_hash == md5,
+                Paper.owner_id == current_user.id
+            ).first()
+            if existing:
                 yield f"data: {json.dumps({**base_info, 'step': 0, 'total': 4, 'message': '文件已存在 (MD5 重复)', 'status': 'error'})}\n\n"
                 continue
             
             yield f"data: {json.dumps({**base_info, 'step': 0, 'total': 4, 'message': '开始处理...', 'status': 'processing'})}\n\n"
             
-            async for progress in process_with_progress(content, file.filename, md5, current_user.id, db):
+            # 保存文件到用户目录（持久化存储）
+            file_info = file_service.save_file(
+                content=content,
+                user_id=current_user.id,
+                md5_hash=md5,
+                original_filename=file.filename
+            )
+            
+            # 标记是否处理成功
+            process_success = False
+            
+            async for progress in process_with_progress(content, file.filename, md5, current_user.id, db, file_info):
                 progress.update(base_info)
                 yield f"data: {json.dumps(progress)}\n\n"
+                
+                # 检查是否处理成功
+                if progress.get('status') == 'success':
+                    process_success = True
+                elif progress.get('status') == 'error':
+                    # 处理失败，删除已保存的文件
+                    file_service.delete_file(current_user.id, md5)
         
         yield f"data: {json.dumps({'done': True})}\n\n"
     

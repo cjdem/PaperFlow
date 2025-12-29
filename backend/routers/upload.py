@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import Paper, User
 from utils import calculate_md5
+from file_service import file_service
 
 from deps import get_db, get_current_user
 
@@ -36,8 +37,6 @@ async def upload_papers(
     process_workflow = paper_main.process_workflow
     
     results = []
-    temp_dir = os.path.join(root_dir, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
     
     for file in files:
         if not file.filename.lower().endswith('.pdf'):
@@ -53,8 +52,12 @@ async def upload_papers(
             content = await file.read()
             md5 = calculate_md5(content)
             
-            # 检查 MD5 是否已存在
-            if db.query(Paper.id).filter(Paper.md5_hash == md5).first():
+            # 检查当前用户是否已有此 MD5 的文件（用户范围去重）
+            existing = db.query(Paper.id).filter(
+                Paper.md5_hash == md5,
+                Paper.owner_id == current_user.id
+            ).first()
+            if existing:
                 results.append({
                     "filename": file.filename,
                     "success": False,
@@ -62,26 +65,41 @@ async def upload_papers(
                 })
                 continue
             
-            # 保存临时文件
-            temp_path = os.path.join(temp_dir, file.filename)
+            # 保存文件到用户目录（持久化存储）
+            file_info = file_service.save_file(
+                content=content,
+                user_id=current_user.id,
+                md5_hash=md5,
+                original_filename=file.filename
+            )
+            
+            # 保存临时文件用于 LLM 处理
+            temp_path = file_service.get_temp_path(file.filename)
             with open(temp_path, "wb") as f:
                 f.write(content)
             
             try:
-                # 处理文件
-                await process_workflow(temp_path, md5, current_user.id)
+                # 处理文件（LLM 分析）
+                await process_workflow(
+                    temp_path, md5, current_user.id,
+                    file_info=file_info  # 传递文件信息
+                )
                 results.append({
                     "filename": file.filename,
                     "success": True,
                     "message": "处理成功"
                 })
             except FileExistsError as e:
+                # 语义重复，删除已保存的文件
+                file_service.delete_file(current_user.id, md5)
                 results.append({
                     "filename": file.filename,
                     "success": False,
                     "message": str(e)
                 })
             except Exception as e:
+                # 处理失败，删除已保存的文件
+                file_service.delete_file(current_user.id, md5)
                 results.append({
                     "filename": file.filename,
                     "success": False,
@@ -89,8 +107,7 @@ async def upload_papers(
                 })
             finally:
                 # 删除临时文件
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                file_service.cleanup_temp(file.filename)
                     
         except Exception as e:
             results.append({

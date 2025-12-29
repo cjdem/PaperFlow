@@ -11,6 +11,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import User, Paper, Group, LLMProvider, SystemConfig
 from llm_pool import llm_manager
+from file_service import file_service
 
 from deps import get_db, get_current_admin
 from schemas import (
@@ -265,3 +266,50 @@ async def set_config(
     
     db.commit()
     return {"message": "设置成功"}
+
+
+# ================= 存储统计 =================
+@router.get("/storage-stats")
+async def get_storage_stats(
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """获取存储统计信息（管理员）"""
+    # 获取文件系统统计
+    storage_stats = file_service.get_all_storage_stats()
+    
+    # 获取用户名映射
+    user_ids = [u["user_id"] for u in storage_stats.get("users", [])]
+    users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    user_map = {u.id: u.username for u in users}
+    
+    # 添加用户名到统计数据
+    for user_stat in storage_stats.get("users", []):
+        user_stat["username"] = user_map.get(user_stat["user_id"], f"user_{user_stat['user_id']}")
+    
+    # 格式化大小为人类可读格式
+    def format_size(size_bytes):
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.2f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.2f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+    
+    return {
+        "total_size": storage_stats["total_size"],
+        "total_size_formatted": format_size(storage_stats["total_size"]),
+        "total_files": storage_stats["total_files"],
+        "users": [
+            {
+                "user_id": u["user_id"],
+                "username": u["username"],
+                "file_count": u["file_count"],
+                "total_size": u["total_size"],
+                "total_size_formatted": format_size(u["total_size"])
+            }
+            for u in storage_stats.get("users", [])
+        ]
+    }

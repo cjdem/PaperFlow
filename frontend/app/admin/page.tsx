@@ -12,6 +12,21 @@ interface AdminStats {
     group_count: number;
 }
 
+interface UserStorageStats {
+    user_id: number;
+    username: string;
+    file_count: number;
+    total_size: number;
+    total_size_formatted: string;
+}
+
+interface StorageStats {
+    total_files: number;
+    total_size: number;
+    total_size_formatted: string;
+    users: UserStorageStats[];
+}
+
 interface LLMProvider {
     id: number;
     name: string;
@@ -78,8 +93,9 @@ export default function AdminPage() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<AdminStats | null>(null);
+    const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
     const [providers, setProviders] = useState<LLMProvider[]>([]);
-    const [activeTab, setActiveTab] = useState<'stats' | 'llm'>('stats');
+    const [activeTab, setActiveTab] = useState<'stats' | 'storage' | 'llm'>('stats');
     const [activePoolTab, setActivePoolTab] = useState<'metadata' | 'analysis'>('metadata');
     const [editingProvider, setEditingProvider] = useState<LLMProvider | null>(null);
     const [isAdding, setIsAdding] = useState(false);
@@ -137,12 +153,14 @@ export default function AdminPage() {
 
     const loadData = async () => {
         const headers = getHeaders();
-        const [statsRes, providersRes] = await Promise.all([
+        const [statsRes, providersRes, storageRes] = await Promise.all([
             fetch(`${API_BASE}/api/admin/stats`, { headers }),
-            fetch(`${API_BASE}/api/admin/llm-providers`, { headers })
+            fetch(`${API_BASE}/api/admin/llm-providers`, { headers }),
+            fetch(`${API_BASE}/api/admin/storage-stats`, { headers })
         ]);
         if (statsRes.ok) setStats(await statsRes.json());
         if (providersRes.ok) setProviders(await providersRes.json());
+        if (storageRes.ok) setStorageStats(await storageRes.json());
     };
 
     const handleEdit = (p: LLMProvider) => {
@@ -484,6 +502,9 @@ export default function AdminPage() {
                     <button onClick={() => setActiveTab('stats')} className={`px-4 py-2 rounded-lg font-medium transition ${activeTab === 'stats' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>
                         📊 系统统计
                     </button>
+                    <button onClick={() => setActiveTab('storage')} className={`px-4 py-2 rounded-lg font-medium transition ${activeTab === 'storage' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>
+                        💾 存储统计
+                    </button>
                     <button onClick={() => setActiveTab('llm')} className={`px-4 py-2 rounded-lg font-medium transition ${activeTab === 'llm' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>
                         🤖 LLM 提供商
                     </button>
@@ -506,6 +527,100 @@ export default function AdminPage() {
                             <div className="text-4xl mb-2">📁</div>
                             <div className="text-3xl font-bold text-white">{stats.group_count}</div>
                             <div className="text-gray-400">分组数</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Storage Stats Tab */}
+                {activeTab === 'storage' && storageStats && (
+                    <div className="space-y-6">
+                        {/* 总体统计 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                                <div className="text-4xl mb-2">📁</div>
+                                <div className="text-3xl font-bold text-white">{storageStats.total_files}</div>
+                                <div className="text-gray-400">总文件数</div>
+                            </div>
+                            <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                                <div className="text-4xl mb-2">💾</div>
+                                <div className="text-3xl font-bold text-white">{storageStats.total_size_formatted}</div>
+                                <div className="text-gray-400">总存储空间</div>
+                            </div>
+                        </div>
+
+                        {/* 用户存储详情 */}
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                            <div className="p-4 border-b border-slate-700">
+                                <h3 className="text-lg font-semibold text-white">👥 用户存储详情</h3>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-slate-700">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">用户</th>
+                                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">文件数</th>
+                                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">存储空间</th>
+                                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">占比</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-700">
+                                        {storageStats.users.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                                                    暂无存储数据
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            storageStats.users.map((user) => (
+                                                <tr key={user.user_id} className="hover:bg-slate-700/50">
+                                                    <td className="px-4 py-3 text-white">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-lg">👤</span>
+                                                            <span>{user.username}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-gray-300">
+                                                        {user.file_count} 个
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-gray-300">
+                                                        {user.total_size_formatted}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <div className="w-20 bg-slate-600 rounded-full h-2">
+                                                                <div
+                                                                    className="bg-purple-500 h-2 rounded-full"
+                                                                    style={{
+                                                                        width: `${storageStats.total_size > 0
+                                                                            ? (user.total_size / storageStats.total_size) * 100
+                                                                            : 0}%`
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-gray-400 text-sm w-12 text-right">
+                                                                {storageStats.total_size > 0
+                                                                    ? ((user.total_size / storageStats.total_size) * 100).toFixed(1)
+                                                                    : 0}%
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* 存储说明 */}
+                        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                            <h4 className="text-sm font-semibold text-gray-300 mb-2">💡 存储说明</h4>
+                            <ul className="text-sm text-gray-400 space-y-1">
+                                <li>• 文件按用户隔离存储，每个用户的文件存放在独立目录</li>
+                                <li>• 同一用户上传相同文件（MD5 相同）会自动去重</li>
+                                <li>• 删除论文时会同步删除对应的 PDF 文件</li>
+                                <li>• 存储路径：<code className="bg-slate-700 px-1 rounded">uploads/papers/user_&#123;id&#125;/</code></li>
+                            </ul>
                         </div>
                     </div>
                 )}
