@@ -194,11 +194,11 @@ PaperFlow/
 
 ### 前后端分离部署
 
-1. **后端 (FastAPI)**: 推荐部署到 Render / Railway / AWS EC2
+1. **后端 (FastAPI)**: 
    - 启动命令: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
    - 记得设置环境变量 (DB_URL, OPENAI_API_KEY 等)
 
-2. **前端 (Next.js)**: 推荐部署到 Vercel / Netlify
+2. **前端 (Next.js)**: 
    - Build Command: `npm run build`
    - Output Directory: `.next` (Vercel 会自动识别)
    - 环境变量: `NEXT_PUBLIC_API_URL` 指向后端地址
@@ -210,6 +210,7 @@ PaperFlow/
 - **数据库**：SQLite (Dev) / PostgreSQL (Prod)
 - **AI 集成**：OpenAI SDK (支持 OpenAI, Gemini, Claude, DeepSeek 等兼容 API)
 - **PDF 解析**：PyMuPDF (fitz)
+- **PDF 翻译**：[pdf2zh-next](https://github.com/Byaidu/PDFMathTranslate) (AGPL-3.0)
 - **Markdown 渲染**：react-markdown + KaTeX (数学公式) + highlight.js (代码高亮)
 
 ## 📝 使用流程
@@ -284,6 +285,16 @@ FILE_STORAGE_PATH=./uploads    # 文件存储根路径
 - 配置 API 地址和密钥
 - 设置 QPS 限制（建议 2-4）
 
-##  许可证
+## 🙏 致谢
 
-MIT License
+本项目的 PDF 翻译功能基于以下优秀的开源项目：
+
+- **[pdf2zh-next (PDFMathTranslate)](https://github.com/Byaidu/PDFMathTranslate)** - 高质量的 PDF 文档翻译工具，支持保留原始格式和数学公式。该项目采用 [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html) 许可证。
+
+感谢 [Byaidu](https://github.com/Byaidu) 及所有贡献者的辛勤工作！
+
+## 📄 许可证
+
+本项目采用 MIT License 许可证。
+
+**注意**：本项目使用的 pdf2zh-next 库采用 AGPL-3.0 许可证。如果您修改了 pdf2zh-next 的代码并通过网络提供服务，您需要按照 AGPL-3.0 的要求公开您的修改。本项目仅通过 pip 安装并调用 pdf2zh-next 的公共 API，未对其进行修改。
