@@ -1,8 +1,156 @@
+
 @import "tailwindcss";
 
+/* ========================================
+   Fluent 2 Design System - CSS Variables
+   PaperFlow Pro - Academic Paper Management
+   ======================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ===== Primary Color - Academic Blue ===== */
+  --fluent-blue-50: #e6f2ff;
+  --fluent-blue-100: #cce4ff;
+  --fluent-blue-200: #99c9ff;
+  --fluent-blue-300: #66adff;
+  --fluent-blue-400: #3392ff;
+  --fluent-blue-500: #0078d4;
+  --fluent-blue-600: #006cbe;
+  --fluent-blue-700: #005a9e;
+  --fluent-blue-800: #004578;
+  --fluent-blue-900: #003052;
+  
+  /* ===== Accent Color - Wisdom Purple ===== */
+  --fluent-purple-50: #f3e8ff;
+  --fluent-purple-100: #e4ccff;
+  --fluent-purple-200: #c999ff;
+  --fluent-purple-300: #ae66ff;
+  --fluent-purple-400: #9333ff;
+  --fluent-purple-500: #7c3aed;
+  --fluent-purple-600: #6d28d9;
+  --fluent-purple-700: #5b21b6;
+  --fluent-purple-800: #4c1d95;
+  --fluent-purple-900: #3b0764;
+  
+  /* ===== Semantic Colors ===== */
+  /* Success - Paper processed, Translation complete */
+  --fluent-success: #10b981;
+  --fluent-success-light: rgba(16, 185, 129, 0.2);
+  --fluent-success-dark: #059669;
+  --fluent-success-text: #6ccf6c;
+  
+  /* Warning - Processing, In queue */
+  --fluent-warning: #ffb900;
+  --fluent-warning-light: rgba(255, 185, 0, 0.2);
+  --fluent-warning-dark: #d97706;
+  --fluent-warning-text: #ffd966;
+  
+  /* Error - Analysis failed, Translation error */
+  --fluent-error: #ef4444;
+  --fluent-error-light: rgba(239, 68, 68, 0.2);
+  --fluent-error-dark: #dc2626;
+  --fluent-error-text: #ff8a8a;
+  
+  /* Info - Tips, Instructions */
+  --fluent-info: #3b82f6;
+  --fluent-info-light: rgba(59, 130, 246, 0.2);
+  --fluent-info-dark: #2563eb;
+  --fluent-info-text: #93c5fd;
+  
+  /* ===== Background Layers (Dark Theme) ===== */
+  --bg-base: #0f0f1a;
+  --bg-surface: #1a1a2e;
+  --bg-elevated: #16213e;
+  --bg-overlay: #0f3460;
+  
+  /* ===== Surface Transparency ===== */
+  --surface-glass: rgba(255, 255, 255, 0.05);
+  --surface-card: rgba(255, 255, 255, 0.08);
+  --surface-hover: rgba(255, 255, 255, 0.12);
+  --surface-active: rgba(255, 255, 255, 0.16);
+  
+  /* ===== Text Hierarchy ===== */
+  --text-primary: #f5f5f5;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #6b7280;
+  --text-disabled: #4b5563;
+  --text-inverse: #1a1a2e;
+  
+  /* ===== Gradients ===== */
+  --gradient-primary: linear-gradient(135deg, #0078d4 0%, #7c3aed 100%);
+  --gradient-background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #1a1a2e 50%, #0f3460 75%, #1a1a2e 100%);
+  --gradient-card-blue: linear-gradient(135deg, rgba(0, 120, 212, 0.2) 0%, rgba(0, 120, 212, 0.05) 100%);
+  --gradient-card-purple: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(124, 58, 237, 0.05) 100%);
+  --gradient-card-green: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+  --gradient-card-orange: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.05) 100%);
+  --gradient-icon-blue: linear-gradient(135deg, #0078d4 0%, #00a2ed 100%);
+  --gradient-icon-purple: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  --gradient-icon-green: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  --gradient-icon-orange: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+  
+  /* ===== Legacy Compatibility ===== */
+  --fluent-background: #1a1a2e;
+  --fluent-background-subtle: #16162a;
+  --fluent-foreground: #f5f5f5;
+  --fluent-foreground-secondary: #a0a0a0;
+  
+  /* Surface & Card Colors */
+  --fluent-surface: rgba(255, 255, 255, 0.05);
+  --fluent-surface-card: rgba(255, 255, 255, 0.08);
+  --fluent-surface-elevated: rgba(255, 255, 255, 0.12);
+  
+  /* Border & Divider */
+  --fluent-border: rgba(255, 255, 255, 0.08);
+  --fluent-border-strong: rgba(255, 255, 255, 0.14);
+  --fluent-divider: rgba(255, 255, 255, 0.06);
+  
+  /* Shadow System */
+  --fluent-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --fluent-shadow-4: 0 2px 4px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.3);
+  --fluent-shadow-8: 0 4px 8px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.3);
+  --fluent-shadow-16: 0 8px 16px rgba(0, 0, 0, 0.24), 0 16px 32px rgba(0, 0, 0, 0.36);
+  --fluent-shadow-28: 0 14px 28px rgba(0, 0, 0, 0.28), 0 28px 56px rgba(0, 0, 0, 0.4);
+  
+  /* Acrylic Effect */
+  --fluent-acrylic-tint: rgba(32, 32, 48, 0.72);
+  --fluent-acrylic-fallback: rgba(28, 28, 42, 0.95);
+  --fluent-acrylic-blur: 20px;
+  
+  /* Border Radius System */
+  --fluent-radius-none: 0;
+  --fluent-radius-sm: 4px;
+  --fluent-radius-md: 8px;
+  --fluent-radius-lg: 12px;
+  --fluent-radius-xl: 16px;
+  --fluent-radius-2xl: 20px;
+  --fluent-radius-full: 9999px;
+  
+  /* Spacing System */
+  --fluent-space-1: 4px;
+  --fluent-space-2: 8px;
+  --fluent-space-3: 12px;
+  --fluent-space-4: 16px;
+  --fluent-space-5: 20px;
+  --fluent-space-6: 24px;
+  --fluent-space-8: 32px;
+  --fluent-space-10: 40px;
+  --fluent-space-12: 48px;
+  
+  /* Animation Timing */
+  --fluent-duration-fast: 150ms;
+  --fluent-duration-normal: 200ms;
+  --fluent-duration-slow: 300ms;
+  --fluent-duration-slower: 450ms;
+  --fluent-easing-standard: cubic-bezier(0.33, 0, 0.67, 1);
+  --fluent-easing-accelerate: cubic-bezier(0.9, 0.1, 1, 0.2);
+  --fluent-easing-decelerate: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --fluent-easing-bounce: cubic-bezier(0.16, 1, 0.3, 1);
+  
+  /* Typography */
+  --fluent-font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --fluent-font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -12,337 +160,1754 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--fluent-background);
+  color: var(--fluent-foreground);
+  font-family: var(--fluent-font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ========================================
-   Production-Level Markdown Styles
+   Fluent 2 Base Components
    ======================================== */
 
-.markdown-content {
-  color: #e2e8f0;
-  font-size: 1.125rem;
-  line-height: 1.9;
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  letter-spacing: -0.01em;
+/* Fluent Background Gradient */
+.fluent-background {
+  background: linear-gradient(135deg,
+    #1a1a2e 0%,
+    #16213e 25%,
+    #1a1a2e 50%,
+    #0f3460 75%,
+    #1a1a2e 100%
+  );
+  background-size: 400% 400%;
+  animation: fluent-gradient 15s ease infinite;
 }
 
-/* ===== 标题样式 ===== */
-.markdown-content h1 {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #fff;
-  margin-top: 2.5rem;
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 3px solid;
-  border-image: linear-gradient(90deg, #a855f7, #6366f1, #3b82f6) 1;
-  letter-spacing: -0.02em;
+@keyframes fluent-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
-.markdown-content h1:first-child {
-  margin-top: 0;
+/* Fluent Acrylic Card */
+.fluent-acrylic {
+  background: var(--fluent-acrylic-tint);
+  backdrop-filter: blur(var(--fluent-acrylic-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--fluent-acrylic-blur)) saturate(180%);
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-radius-xl);
+  box-shadow: var(--fluent-shadow-8);
 }
 
-.markdown-content h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #f8fafc;
-  margin-top: 2rem;
-  margin-bottom: 1rem;
-  padding-left: 1rem;
-  border-left: 4px solid #a855f7;
-  background: linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, transparent 100%);
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  border-radius: 0 0.5rem 0.5rem 0;
+/* Fallback for browsers without backdrop-filter */
+@supports not (backdrop-filter: blur(20px)) {
+  .fluent-acrylic {
+    background: var(--fluent-acrylic-fallback);
+  }
 }
 
-.markdown-content h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  margin-top: 1.75rem;
-  margin-bottom: 0.75rem;
+/* Fluent Card with Highlight Border */
+.fluent-card {
+  background: linear-gradient(145deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--fluent-radius-lg);
+  box-shadow:
+    var(--fluent-shadow-4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    transform var(--fluent-duration-normal) var(--fluent-easing-decelerate),
+    box-shadow var(--fluent-duration-normal) var(--fluent-easing-decelerate),
+    border-color var(--fluent-duration-normal) var(--fluent-easing-decelerate);
 }
 
-.markdown-content h4,
-.markdown-content h5,
-.markdown-content h6 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #e2e8f0;
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
+.fluent-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    var(--fluent-shadow-16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* ===== 段落和文本 ===== */
-.markdown-content p {
-  margin: 1.25rem 0;
-  color: #e2e8f0;
-}
-
-.markdown-content strong {
-  color: #fff;
-  font-weight: 600;
-}
-
-.markdown-content em {
-  color: #c4b5fd;
-  font-style: italic;
-}
-
-.markdown-content a {
-  color: #60a5fa;
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: all 0.2s ease;
+/* Fluent Button - Primary */
+.fluent-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fluent-space-2);
+  padding: var(--fluent-space-2) var(--fluent-space-4);
   font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  border-radius: var(--fluent-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--fluent-duration-fast) var(--fluent-easing-standard),
+    box-shadow var(--fluent-duration-fast) var(--fluent-easing-standard),
+    transform var(--fluent-duration-fast) var(--fluent-easing-standard);
 }
 
-.markdown-content a:hover {
-  color: #93c5fd;
-  border-bottom-color: #60a5fa;
-}
-
-/* ===== 列表 ===== */
-.markdown-content ul,
-.markdown-content ol {
-  margin: 1.25rem 0;
-  padding-left: 1.75rem;
-  color: #e2e8f0;
-}
-
-.markdown-content li {
-  margin: 0.625rem 0;
-  line-height: 1.75;
-}
-
-.markdown-content li::marker {
-  color: #a855f7;
-  font-weight: 600;
-}
-
-.markdown-content ul ul,
-.markdown-content ol ol,
-.markdown-content ul ol,
-.markdown-content ol ul {
-  margin: 0.375rem 0;
-}
-
-/* ===== 行内代码 ===== */
-.markdown-content .inline-code,
-.markdown-content code:not(pre code) {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-  color: #f472b6;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-family: var(--font-jetbrains), 'Fira Code', monospace;
-  font-size: 0.875em;
-  border: 1px solid #475569;
-  font-weight: 500;
-}
-
-/* ===== 代码块容器 ===== */
-.markdown-content .code-block-wrapper {
-  position: relative;
-  margin: 1.75rem 0;
-}
-
-.markdown-content .code-language-tag {
-  position: absolute;
-  top: 0;
-  left: 1rem;
-  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+.fluent-button-primary {
+  background: linear-gradient(135deg, var(--fluent-blue-500) 0%, var(--fluent-blue-600) 100%);
   color: white;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.25rem 0.75rem;
-  border-radius: 0 0 0.5rem 0.5rem;
-  font-family: var(--font-jetbrains), monospace;
-  letter-spacing: 0.05em;
-  z-index: 10;
+  box-shadow:
+    0 1px 2px rgba(0, 120, 212, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-.markdown-content .code-block,
-.markdown-content pre {
-  background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
-  border: 1px solid #30363d;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  padding-top: 2.5rem;
-  margin: 0;
-  overflow-x: auto;
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4), 0 4px 8px -2px rgba(0, 0, 0, 0.3);
+.fluent-button-primary:hover {
+  background: linear-gradient(135deg, var(--fluent-blue-400) 0%, var(--fluent-blue-500) 100%);
+  box-shadow:
+    0 4px 12px rgba(0, 120, 212, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.markdown-content pre code {
-  background: transparent !important;
-  color: #e6edf3;
-  padding: 0;
-  border: none;
-  font-family: var(--font-jetbrains), 'Fira Code', monospace;
-  font-size: 0.875rem;
-  line-height: 1.7;
+.fluent-button-primary:active {
+  transform: scale(0.98);
 }
 
-/* ===== 引用块 ===== */
-.markdown-content blockquote {
-  margin: 1.75rem 0;
-  padding: 1.25rem 1.5rem;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
-  border-left: 4px solid #a855f7;
-  border-radius: 0 0.75rem 0.75rem 0;
-  color: #d1d5db;
-  font-style: italic;
-  position: relative;
+/* Fluent Button - Accent (Purple) */
+.fluent-button-accent {
+  background: linear-gradient(135deg, var(--fluent-purple-500) 0%, var(--fluent-purple-600) 100%);
+  color: white;
+  box-shadow:
+    0 1px 2px rgba(124, 58, 237, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-.markdown-content blockquote::before {
-  content: '"';
-  position: absolute;
-  top: -0.5rem;
-  left: 1rem;
-  font-size: 3rem;
-  color: rgba(168, 85, 247, 0.3);
-  font-family: Georgia, serif;
-  line-height: 1;
+.fluent-button-accent:hover {
+  background: linear-gradient(135deg, var(--fluent-purple-400) 0%, var(--fluent-purple-500) 100%);
+  box-shadow:
+    0 4px 12px rgba(124, 58, 237, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.markdown-content blockquote p {
-  margin: 0;
-  padding-left: 1rem;
+/* Fluent Button - Subtle */
+.fluent-button-subtle {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fluent-foreground);
+  border: 1px solid var(--fluent-border);
 }
 
-/* ===== 表格 ===== */
-.markdown-content .table-wrapper {
-  overflow-x: auto;
-  margin: 1.75rem 0;
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.25);
+.fluent-button-subtle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--fluent-border-strong);
 }
 
-.markdown-content table {
+/* Fluent Input */
+.fluent-input {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 600px;
+  padding: var(--fluent-space-2) var(--fluent-space-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-radius-md);
+  color: var(--fluent-foreground);
+  font-size: 14px;
+  line-height: 20px;
+  transition:
+    border-color var(--fluent-duration-fast) var(--fluent-easing-standard),
+    box-shadow var(--fluent-duration-fast) var(--fluent-easing-standard),
+    background var(--fluent-duration-fast) var(--fluent-easing-standard);
 }
 
-.markdown-content thead {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+.fluent-input::placeholder {
+  color: var(--fluent-foreground-secondary);
 }
 
-.markdown-content th {
-  padding: 1rem 1.25rem;
+.fluent-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--fluent-border-strong);
+}
+
+.fluent-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--fluent-blue-500);
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+/* Fluent Sidebar */
+.fluent-sidebar {
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-right: 1px solid var(--fluent-border);
+}
+
+/* Fluent Nav Item */
+.fluent-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--fluent-space-3);
+  padding: var(--fluent-space-2) var(--fluent-space-4);
+  border-radius: var(--fluent-radius-md);
+  color: var(--fluent-foreground-secondary);
+  font-weight: 500;
+  font-size: 14px;
+  transition:
+    background var(--fluent-duration-fast) var(--fluent-easing-standard),
+    color var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fluent-foreground);
+}
+
+.fluent-nav-item.active {
+  background: linear-gradient(135deg, var(--fluent-blue-500) 0%, var(--fluent-purple-500) 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+}
+
+/* Fluent Badge */
+.fluent-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--fluent-radius-full);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fluent-foreground);
+}
+
+.fluent-badge-primary {
+  background: linear-gradient(135deg, var(--fluent-blue-500) 0%, var(--fluent-blue-600) 100%);
+  color: white;
+}
+
+.fluent-badge-accent {
+  background: linear-gradient(135deg, var(--fluent-purple-500) 0%, var(--fluent-purple-600) 100%);
+  color: white;
+}
+
+.fluent-badge-success {
+  background: var(--fluent-success-light);
+  color: var(--fluent-success-text);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.fluent-badge-warning {
+  background: var(--fluent-warning-light);
+  color: var(--fluent-warning-text);
+  border: 1px solid rgba(255, 185, 0, 0.3);
+}
+
+.fluent-badge-error {
+  background: var(--fluent-error-light);
+  color: var(--fluent-error-text);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.fluent-badge-info {
+  background: var(--fluent-info-light);
+  color: var(--fluent-info-text);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Fluent Progress Bar */
+.fluent-progress {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--fluent-radius-full);
+  overflow: hidden;
+}
+
+.fluent-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--fluent-blue-500) 0%, var(--fluent-purple-500) 100%);
+  border-radius: var(--fluent-radius-full);
+  transition: width var(--fluent-duration-slow) var(--fluent-easing-decelerate);
+}
+
+/* Fluent Modal Overlay */
+.fluent-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Fluent Modal */
+.fluent-modal {
+  background: linear-gradient(145deg,
+    rgba(40, 40, 60, 0.95) 0%,
+    rgba(30, 30, 50, 0.98) 100%
+  );
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--fluent-radius-xl);
+  box-shadow: var(--fluent-shadow-28);
+}
+
+/* Fluent Table */
+.fluent-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.fluent-table thead {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fluent-table th {
+  padding: var(--fluent-space-3) var(--fluent-space-4);
   text-align: left;
   font-weight: 600;
-  color: #f8fafc;
-  border-bottom: 2px solid #475569;
-  white-space: nowrap;
+  font-size: 13px;
+  color: var(--fluent-foreground-secondary);
+  border-bottom: 1px solid var(--fluent-border);
 }
 
-.markdown-content td {
-  padding: 1rem 1.25rem;
-  color: #e2e8f0;
-  border-bottom: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.6);
+.fluent-table td {
+  padding: var(--fluent-space-3) var(--fluent-space-4);
+  font-size: 14px;
+  color: var(--fluent-foreground);
+  border-bottom: 1px solid var(--fluent-divider);
 }
 
-.markdown-content tbody tr:nth-child(even) td {
-  background: rgba(30, 41, 59, 0.4);
+.fluent-table tbody tr {
+  transition: background var(--fluent-duration-fast) var(--fluent-easing-standard);
 }
 
-.markdown-content tbody tr:hover td {
-  background: rgba(139, 92, 246, 0.1);
+.fluent-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.markdown-content tbody tr:last-child td {
+/* Fluent Tabs */
+.fluent-tabs {
+  display: flex;
+  gap: var(--fluent-space-1);
+  padding: var(--fluent-space-1);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--fluent-radius-lg);
+}
+
+.fluent-tab {
+  padding: var(--fluent-space-2) var(--fluent-space-4);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--fluent-foreground-secondary);
+  border-radius: var(--fluent-radius-md);
+  transition:
+    background var(--fluent-duration-fast) var(--fluent-easing-standard),
+    color var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fluent-foreground);
+}
+
+.fluent-tab.active {
+  background: linear-gradient(135deg, var(--fluent-blue-500) 0%, var(--fluent-purple-500) 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+}
+
+/* Fluent Stat Card */
+.fluent-stat-card {
+  position: relative;
+  padding: var(--fluent-space-5);
+  background: linear-gradient(145deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--fluent-radius-xl);
+  overflow: hidden;
+  transition:
+    transform var(--fluent-duration-normal) var(--fluent-easing-decelerate),
+    box-shadow var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.fluent-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--fluent-blue-500) 0%, var(--fluent-purple-500) 100%);
+  opacity: 0;
+  transition: opacity var(--fluent-duration-normal) var(--fluent-easing-standard);
+}
+
+.fluent-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--fluent-shadow-16);
+}
+
+.fluent-stat-card:hover::before {
+  opacity: 1;
+}
+
+/* Fluent Checkbox */
+.fluent-checkbox {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--fluent-border-strong);
+  border-radius: var(--fluent-radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--fluent-duration-fast) var(--fluent-easing-standard),
+    border-color var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-checkbox:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--fluent-blue-400);
+}
+
+.fluent-checkbox:checked {
+  background: linear-gradient(135deg, var(--fluent-blue-500) 0%, var(--fluent-purple-500) 100%);
+  border-color: transparent;
+}
+
+.fluent-checkbox:checked::after {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Fluent Select */
+.fluent-select {
+  appearance: none;
+  padding: var(--fluent-space-2) var(--fluent-space-3);
+  padding-right: var(--fluent-space-8);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-radius-md);
+  color: var(--fluent-foreground);
+  font-size: 14px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition:
+    border-color var(--fluent-duration-fast) var(--fluent-easing-standard),
+    background var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-select:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: var(--fluent-border-strong);
+}
+
+.fluent-select:focus {
+  outline: none;
+  border-color: var(--fluent-blue-500);
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+/* Fluent Tooltip */
+.fluent-tooltip {
+  padding: var(--fluent-space-2) var(--fluent-space-3);
+  background: rgba(40, 40, 60, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--fluent-radius-md);
+  font-size: 12px;
+  color: var(--fluent-foreground);
+  box-shadow: var(--fluent-shadow-8);
+}
+
+/* ========================================
+   Animation Classes
+   ======================================== */
+
+/* Basic Fade In */
+.fluent-fade-in {
+  animation: fluent-fade-in var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+@keyframes fluent-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale In */
+.fluent-scale-in {
+  animation: fluent-scale-in var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+@keyframes fluent-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Slide Up */
+.fluent-slide-up {
+  animation: fluent-slide-up var(--fluent-duration-slow) var(--fluent-easing-decelerate);
+}
+
+@keyframes fluent-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale Blur Animation */
+.fluent-scale-blur {
+  animation: scaleBlur var(--fluent-duration-slow) var(--fluent-easing-bounce);
+}
+
+@keyframes scaleBlur {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Blur Fade In (from left) */
+.fluent-blur-fade-in {
+  animation: blurFadeIn var(--fluent-duration-slow) var(--fluent-easing-bounce);
+}
+
+@keyframes blurFadeIn {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateX(0);
+  }
+}
+
+/* Modal Glass Zoom Rotate */
+.fluent-modal-zoom {
+  animation: modalGlassZoomRotate var(--fluent-duration-slow) var(--fluent-easing-bounce);
+}
+
+@keyframes modalGlassZoomRotate {
+  from {
+    opacity: 0;
+    transform: scale(0.8) rotate(2deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* Slide Down Blur (for Toast) */
+.fluent-slide-down-blur {
+  animation: slideDownBlur 0.6s var(--fluent-easing-bounce);
+}
+
+@keyframes slideDownBlur {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Dropdown Expand */
+.fluent-dropdown-expand {
+  animation: dropdownExpand var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+  transform-origin: top;
+}
+
+@keyframes dropdownExpand {
+  from {
+    opacity: 0;
+    transform: scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Staggered List Animation */
+.fluent-stagger-item {
+  animation: blurFadeIn var(--fluent-duration-slow) var(--fluent-easing-bounce) backwards;
+}
+
+.fluent-stagger-item:nth-child(1) { animation-delay: 0ms; }
+.fluent-stagger-item:nth-child(2) { animation-delay: 50ms; }
+.fluent-stagger-item:nth-child(3) { animation-delay: 100ms; }
+.fluent-stagger-item:nth-child(4) { animation-delay: 150ms; }
+.fluent-stagger-item:nth-child(5) { animation-delay: 200ms; }
+.fluent-stagger-item:nth-child(6) { animation-delay: 250ms; }
+.fluent-stagger-item:nth-child(7) { animation-delay: 300ms; }
+.fluent-stagger-item:nth-child(8) { animation-delay: 350ms; }
+.fluent-stagger-item:nth-child(9) { animation-delay: 400ms; }
+.fluent-stagger-item:nth-child(10) { animation-delay: 450ms; }
+
+/* Progress Indeterminate */
+@keyframes indeterminate {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+/* Progress Shine */
+@keyframes progressShine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Toast Exit */
+@keyframes toastExit {
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .fluent-fade-in,
+  .fluent-scale-in,
+  .fluent-slide-up,
+  .fluent-scale-blur,
+  .fluent-blur-fade-in,
+  .fluent-modal-zoom,
+  .fluent-slide-down-blur,
+  .fluent-dropdown-expand,
+  .fluent-stagger-item {
+    animation: none;
+  }
+  
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================
+   Enhanced Component Styles - Fluent 2
+   ======================================== */
+
+/* Enhanced Statistics Card */
+.fluent-stat-card-enhanced {
+  position: relative;
+  padding: var(--fluent-space-6);
+  background: linear-gradient(145deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--fluent-radius-xl);
+  overflow: hidden;
+  transition: all var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.fluent-stat-card-enhanced::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity var(--fluent-duration-normal) var(--fluent-easing-standard);
+}
+
+.fluent-stat-card-enhanced::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 50%
+  );
+  opacity: 0;
+  transition: opacity var(--fluent-duration-normal) var(--fluent-easing-standard);
+  pointer-events: none;
+}
+
+.fluent-stat-card-enhanced:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    var(--fluent-shadow-16),
+    0 0 40px rgba(0, 120, 212, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.fluent-stat-card-enhanced:hover::before {
+  opacity: 1;
+}
+
+.fluent-stat-card-enhanced:hover::after {
+  opacity: 1;
+}
+
+/* Stat Card Color Variants */
+.fluent-stat-card-blue {
+  background: var(--gradient-card-blue);
+}
+
+.fluent-stat-card-blue::before {
+  background: var(--gradient-icon-blue);
+}
+
+.fluent-stat-card-purple {
+  background: var(--gradient-card-purple);
+}
+
+.fluent-stat-card-purple::before {
+  background: var(--gradient-icon-purple);
+}
+
+.fluent-stat-card-green {
+  background: var(--gradient-card-green);
+}
+
+.fluent-stat-card-green::before {
+  background: var(--gradient-icon-green);
+}
+
+.fluent-stat-card-orange {
+  background: var(--gradient-card-orange);
+}
+
+.fluent-stat-card-orange::before {
+  background: var(--gradient-icon-orange);
+}
+
+/* Stat Card Icon Container */
+.fluent-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--fluent-radius-lg);
+  background: var(--gradient-icon-blue);
+  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+  transition: all var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.fluent-stat-icon-purple {
+  background: var(--gradient-icon-purple);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.fluent-stat-icon-green {
+  background: var(--gradient-icon-green);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.fluent-stat-icon-orange {
+  background: var(--gradient-icon-orange);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+.fluent-stat-card-enhanced:hover .fluent-stat-icon {
+  transform: scale(1.1);
+}
+
+/* Enhanced Glass Table */
+.fluent-table-glass {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: var(--fluent-radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fluent-table-glass thead {
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+}
+
+.fluent-table-glass th {
+  padding: var(--fluent-space-4);
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fluent-table-glass td {
+  padding: var(--fluent-space-4);
+  font-size: 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-table-glass tbody tr {
+  transition: all var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-table-glass tbody tr:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fluent-table-glass tbody tr:hover td {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.fluent-table-glass tbody tr:last-child td {
   border-bottom: none;
 }
 
-/* 表格第一行圆角 */
-.markdown-content thead th:first-child {
-  border-top-left-radius: 0.75rem;
+/* Table Row Selection */
+.fluent-table-glass tbody tr.selected {
+  background: rgba(0, 120, 212, 0.15);
 }
 
-.markdown-content thead th:last-child {
-  border-top-right-radius: 0.75rem;
+.fluent-table-glass tbody tr.selected:hover {
+  background: rgba(0, 120, 212, 0.2);
 }
 
-.markdown-content tbody tr:last-child td:first-child {
-  border-bottom-left-radius: 0.75rem;
+/* ========================================
+   Toast Notification System
+   ======================================== */
+
+.toast-container {
+  position: fixed;
+  top: var(--fluent-space-6);
+  right: var(--fluent-space-6);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fluent-space-3);
+  pointer-events: none;
 }
 
-.markdown-content tbody tr:last-child td:last-child {
-  border-bottom-right-radius: 0.75rem;
+.toast-glass {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fluent-space-3);
+  padding: var(--fluent-space-4);
+  min-width: 320px;
+  max-width: 420px;
+  background: linear-gradient(145deg,
+    rgba(40, 40, 60, 0.95) 0%,
+    rgba(30, 30, 50, 0.98) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--fluent-radius-lg);
+  box-shadow: var(--fluent-shadow-16);
+  pointer-events: auto;
+  animation: slideDownBlur 0.4s var(--fluent-easing-bounce);
 }
 
-/* ===== 水平线 ===== */
-.markdown-content hr {
-  margin: 2.5rem 0;
-  border: none;
-  height: 2px;
-  background: linear-gradient(90deg, transparent 0%, #475569 20%, #a855f7 50%, #475569 80%, transparent 100%);
-  border-radius: 1px;
+.toast-glass.toast-exit {
+  animation: toastExit 0.3s var(--fluent-easing-accelerate) forwards;
 }
 
-/* ===== 图片 ===== */
-.markdown-content img {
-  max-width: 100%;
-  border-radius: 0.75rem;
-  margin: 1.75rem auto;
-  display: block;
-  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.4);
+.toast-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fluent-radius-full);
 }
 
-/* ===== KaTeX 公式 ===== */
-.markdown-content .katex {
-  font-size: 1.1em;
-  color: #e2e8f0;
+.toast-success .toast-icon {
+  background: var(--fluent-success-light);
+  color: var(--fluent-success-text);
 }
 
-.markdown-content .katex-display {
-  margin: 1.75rem 0;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
-  border: 1px solid #334155;
-  border-radius: 0.75rem;
-  overflow-x: auto;
+.toast-error .toast-icon {
+  background: var(--fluent-error-light);
+  color: var(--fluent-error-text);
 }
 
-/* ===== 任务列表 ===== */
-.markdown-content input[type="checkbox"] {
-  margin-right: 0.5rem;
-  accent-color: #a855f7;
-  width: 1.1em;
-  height: 1.1em;
+.toast-warning .toast-icon {
+  background: var(--fluent-warning-light);
+  color: var(--fluent-warning-text);
 }
 
-/* ===== 脚注 ===== */
-.markdown-content .footnotes {
-  margin-top: 2.5rem;
-  padding-top: 1.25rem;
-  border-top: 2px solid #334155;
-  font-size: 0.9rem;
-  color: #94a3b8;
+.toast-info .toast-icon {
+  background: var(--fluent-info-light);
+  color: var(--fluent-info-text);
 }
 
-/* ===== 语法高亮覆盖 (适配 github-dark 主题) ===== */
-.markdown-content pre code.hljs {
-  background: transparent !important;
-  padding: 0 !important;
+.toast-content {
+  flex: 1;
+  min-width: 0;
 }
 
-.markdown-content .hljs {
-  background: transparent !important;
+.toast-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.toast-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fluent-radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  border-radius: 0 0 var(--fluent-radius-lg) var(--fluent-radius-lg);
+  animation: toastProgress linear forwards;
+}
+
+@keyframes toastProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* ========================================
+   Enhanced Progress Bar
+   ======================================== */
+
+.fluent-progress-glass {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--fluent-radius-full);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fluent-progress-glass-bar {
+  height: 100%;
+  background: var(--gradient-primary);
+  border-radius: var(--fluent-radius-full);
+  transition: width var(--fluent-duration-slow) var(--fluent-easing-decelerate);
+  position: relative;
+  overflow: hidden;
+}
+
+.fluent-progress-glass-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: progressShine 2s ease-in-out infinite;
+}
+
+.fluent-progress-indeterminate .fluent-progress-glass-bar {
+  width: 40%;
+  position: absolute;
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+/* Progress Size Variants */
+.fluent-progress-sm {
+  height: 4px;
+}
+
+.fluent-progress-lg {
+  height: 12px;
+}
+
+/* Progress Color Variants */
+.fluent-progress-success .fluent-progress-glass-bar {
+  background: var(--gradient-icon-green);
+}
+
+.fluent-progress-warning .fluent-progress-glass-bar {
+  background: var(--gradient-icon-orange);
+}
+
+.fluent-progress-error .fluent-progress-glass-bar {
+  background: linear-gradient(90deg, var(--fluent-error) 0%, var(--fluent-error-dark) 100%);
+}
+
+/* ========================================
+   Enhanced Search Box
+   ======================================== */
+
+.fluent-search-container {
+  position: relative;
+  width: 100%;
+}
+
+.fluent-search-input {
+  width: 100%;
+  padding: var(--fluent-space-3) var(--fluent-space-4);
+  padding-left: 44px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--fluent-radius-lg);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.fluent-search-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.fluent-search-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--fluent-blue-500);
+  box-shadow:
+    0 0 0 3px rgba(0, 120, 212, 0.2),
+    var(--fluent-shadow-4);
+}
+
+.fluent-search-icon {
+  position: absolute;
+  left: var(--fluent-space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+  transition: color var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-search-input:focus + .fluent-search-icon,
+.fluent-search-container:focus-within .fluent-search-icon {
+  color: var(--fluent-blue-400);
+}
+
+.fluent-search-clear {
+  position: absolute;
+  right: var(--fluent-space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fluent-radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-search-container:focus-within .fluent-search-clear,
+.fluent-search-input:not(:placeholder-shown) ~ .fluent-search-clear {
+  opacity: 1;
+}
+
+.fluent-search-clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* ========================================
+   Enhanced File Upload Area
+   ======================================== */
+
+.fluent-upload-area {
+  position: relative;
+  padding: var(--fluent-space-8);
+  background: linear-gradient(145deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: var(--fluent-radius-xl);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.fluent-upload-area:hover {
+  background: linear-gradient(145deg,
+    rgba(0, 120, 212, 0.1) 0%,
+    rgba(0, 120, 212, 0.05) 100%
+  );
+  border-color: var(--fluent-blue-400);
+  transform: translateY(-2px);
+}
+
+.fluent-upload-area.drag-over {
+  background: linear-gradient(145deg,
+    rgba(0, 120, 212, 0.15) 0%,
+    rgba(0, 120, 212, 0.08) 100%
+  );
+  border-color: var(--fluent-blue-500);
+  border-style: solid;
+  box-shadow:
+    0 0 0 4px rgba(0, 120, 212, 0.2),
+    var(--fluent-shadow-8);
+}
+
+.fluent-upload-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--fluent-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-card-blue);
+  border-radius: var(--fluent-radius-xl);
+  color: var(--fluent-blue-400);
+  transition: all var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.fluent-upload-area:hover .fluent-upload-icon {
+  transform: scale(1.1);
+  background: var(--gradient-icon-blue);
+  color: white;
+}
+
+.fluent-upload-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--fluent-space-2);
+}
+
+.fluent-upload-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.fluent-upload-formats {
+  margin-top: var(--fluent-space-4);
+  display: flex;
+  justify-content: center;
+  gap: var(--fluent-space-2);
+  flex-wrap: wrap;
+}
+
+.fluent-upload-format-tag {
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--fluent-radius-sm);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ========================================
+   Custom Glass Scrollbar
+   ======================================== */
+
+.scrollbar-glass {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.scrollbar-glass::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-glass::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: var(--fluent-radius-full);
+}
+
+.scrollbar-glass::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--fluent-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.scrollbar-glass::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+  background-clip: padding-box;
+}
+
+.scrollbar-glass::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.35);
+  background-clip: padding-box;
+}
+
+.scrollbar-glass::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Thin Scrollbar Variant */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+/* ========================================
+   Enhanced Dropdown Menu
+   ======================================== */
+
+.fluent-dropdown-menu {
+  position: absolute;
+  min-width: 180px;
+  padding: var(--fluent-space-2);
+  background: linear-gradient(145deg,
+    rgba(40, 40, 60, 0.98) 0%,
+    rgba(30, 30, 50, 0.99) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--fluent-radius-lg);
+  box-shadow: var(--fluent-shadow-16);
+  z-index: 1000;
+  animation: dropdownExpand var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+  transform-origin: top;
+}
+
+.fluent-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--fluent-space-3);
+  padding: var(--fluent-space-2) var(--fluent-space-3);
+  border-radius: var(--fluent-radius-md);
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fluent-dropdown-item:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.fluent-dropdown-item-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.fluent-dropdown-item:hover .fluent-dropdown-item-icon {
+  color: var(--fluent-blue-400);
+}
+
+.fluent-dropdown-divider {
+  height: 1px;
+  margin: var(--fluent-space-2) 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fluent-dropdown-item-danger {
+  color: var(--fluent-error-text);
+}
+
+.fluent-dropdown-item-danger:hover {
+  background: var(--fluent-error-light);
+}
+
+/* ========================================
+   Enhanced Modal
+   ======================================== */
+
+.fluent-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fluent-space-6);
+  animation: fluent-fade-in var(--fluent-duration-fast) var(--fluent-easing-decelerate);
+}
+
+.fluent-modal-enhanced {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  background: linear-gradient(145deg,
+    rgba(40, 40, 60, 0.98) 0%,
+    rgba(30, 30, 50, 0.99) 100%
+  );
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--fluent-radius-2xl);
+  box-shadow:
+    var(--fluent-shadow-28),
+    0 0 80px rgba(0, 120, 212, 0.1);
+  overflow: hidden;
+  animation: modalGlassZoomRotate var(--fluent-duration-slow) var(--fluent-easing-bounce);
+}
+
+.fluent-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--fluent-space-5) var(--fluent-space-6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fluent-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fluent-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fluent-radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--fluent-duration-fast) var(--fluent-easing-standard);
+}
+
+.fluent-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.fluent-modal-body {
+  padding: var(--fluent-space-6);
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
+}
+
+.fluent-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fluent-space-3);
+  padding: var(--fluent-space-4) var(--fluent-space-6);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Status Utility Classes
+   ======================================== */
+
+.status-pending {
+  color: var(--fluent-warning-text);
+}
+
+.status-processing {
+  color: var(--fluent-info-text);
+}
+
+.status-completed {
+  color: var(--fluent-success-text);
+}
+
+.status-failed {
+  color: var(--fluent-error-text);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--fluent-radius-full);
+  margin-right: var(--fluent-space-2);
+}
+
+.status-dot-pending {
+  background: var(--fluent-warning);
+  box-shadow: 0 0 8px var(--fluent-warning);
+}
+
+.status-dot-processing {
+  background: var(--fluent-info);
+  box-shadow: 0 0 8px var(--fluent-info);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot-completed {
+  background: var(--fluent-success);
+  box-shadow: 0 0 8px var(--fluent-success);
+}
+
+.status-dot-failed {
+  background: var(--fluent-error);
+  box-shadow: 0 0 8px var(--fluent-error);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ========================================
+   Gradient Text Utilities
+   ======================================== */
+
+.gradient-text-primary {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-blue {
+  background: var(--gradient-icon-blue);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-purple {
+  background: var(--gradient-icon-purple);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========================================
+   Skeleton Loading
+   ======================================== */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--fluent-radius-md);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+  height: 16px;
+  margin-bottom: var(--fluent-space-2);
+}
+
+.skeleton-title {
+  height: 24px;
+  width: 60%;
+  margin-bottom: var(--fluent-space-3);
+}
+
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--fluent-radius-full);
+}
+
+.skeleton-card {
+  height: 120px;
+}
+
+/* ========================================
+   Hover Effects
+   ======================================== */
+
+.hover-lift {
+  transition: transform var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+.hover-glow {
+  transition: box-shadow var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px rgba(0, 120, 212, 0.3);
+}
+
+.hover-scale {
+  transition: transform var(--fluent-duration-fast) var(--fluent-easing-decelerate);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* ========================================
+   Focus Visible Styles
+   ======================================== */
+
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.4);
+}
+
+/* ========================================
+   Responsive Utilities
+   ======================================== */
+
+@media (max-width: 768px) {
+  .toast-container {
+    left: var(--fluent-space-4);
+    right: var(--fluent-space-4);
+  }
+  
+  .toast-glass {
+    min-width: auto;
+    max-width: none;
+  }
+  
+  .fluent-modal-enhanced {
+    max-width: calc(100% - var(--fluent-space-8));
+    margin: var(--fluent-space-4);
+  }
+}
+
+/* ========================================
+   Card Expand Animation System
+   ======================================== */
+
+/* Expandable Card Container */
+.expandable-card {
+  position: relative;
+  overflow: hidden;
+  transition: all var(--fluent-duration-normal) var(--fluent-easing-decelerate);
+}
+
+.expandable-card.expanded {
+  box-shadow: var(--fluent-shadow-16);
+}
+
+/* Grid-based height animation for smooth expand/collapse */
+.expand-container {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.expand-container.expanded {
+  grid-template-rows: 1fr;
+}
+
+.expand-content {
+  overflow: hidden;
+}
+
+/* Expand content inner animation */
+.expand-content-inner {
+  opacity: 0;
+  transform: translateY(-10px);
+  filter: blur(4px);
+  transition:
+    opacity 0.3s ease-out 0.1s,
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.1s,
+    filter 0.3s ease-out 0.1s;
+}
+
+.expand-container.expanded .expand-content-inner {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* Expand indicator arrow */
+.expand-indicator {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.expand-indicator.expanded {
+  transform: rotate(180deg);
+}
+
+/* Card hover effect when expandable */
+.expandable-card:not(.expanded):hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Expanded card glow effect */
+.expandable-card.expanded {
+  border-color: rgba(0, 120, 212, 0.3);
+}
+
+.expandable-card.expanded::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 120, 212, 0.03) 100%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Staggered tab animation */
+.expand-tabs {
+  display: flex;
+  gap: var(--fluent-space-1);
+}
+
+.expand-tab {
+  opacity: 0;
+  transform: translateY(-5px);
+  animation: expandTabIn 0.3s ease-out forwards;
+}
+
+.expand-tab:nth-child(1) { animation-delay: 0.15s; }
+.expand-tab:nth-child(2) { animation-delay: 0.2s; }
+.expand-tab:nth-child(3) { animation-delay: 0.25s; }
+.expand-tab:nth-child(4) { animation-delay: 0.3s; }
+
+@keyframes expandTabIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Content section fade in */
+.expand-section {
+  animation: expandSectionIn 0.4s ease-out forwards;
+}
+
+@keyframes expandSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Clickable card area indicator */
+.card-clickable {
+  cursor: pointer;
+  position: relative;
+}
+
+.card-clickable::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background 0.2s ease;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.card-clickable:hover::before {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.card-clickable:active::before {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Collapse animation */
+.expand-container:not(.expanded) .expand-content-inner {
+  opacity: 0;
+  transform: translateY(-10px);
+  filter: blur(4px);
+  transition:
+    opacity 0.15s ease-in,
+    transform 0.15s ease-in,
+    filter 0.15s ease-in;
 }

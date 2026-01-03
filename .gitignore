@@ -136,6 +136,12 @@ tests/
 # PDFMathTranslate source code (installed via pip)
 PDFMathTranslate-next-main/
 
+# UI Prompt reference files
+UI-Prompt-main/
+
+# Vditor editor source
+vditor-master/
+
 # OS generated files
 *.DS_Store
 .DS_Store?

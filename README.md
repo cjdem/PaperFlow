@@ -17,7 +17,7 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
   - 用户隔离存储，按用户目录管理
   - 智能去重（同一用户不重复存储相同文件）
   - 支持重新分析已存储的论文
-- **� 高级搜索与筛选**：
+- **🔍 高级搜索与筛选**：
   - 多字段搜索（标题、作者、摘要、期刊）
   - 年份范围筛选
   - 期刊多选筛选
@@ -30,7 +30,11 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
   - **🔄 顺序故障转移**：按优先级顺序尝试模型
   - **🔁 智能重试**：可配置单模型重试次数，死磕到底
 - **📊 存储统计**：管理员可查看各用户存储使用情况
-- **🎨 现代 UI 设计**：基于 TailwindCSS 的响应式深色界面
+- **🎨 现代 UI 设计**：
+  - 基于 Fluent 2 设计系统的深色主题
+  - 流畅的动画效果（卡片展开、模态框、Toast 通知）
+  - 玻璃拟态（Glassmorphism）视觉效果
+  - 响应式布局，支持移动端
 
 ## 🚀 快速开始
 
@@ -139,13 +143,20 @@ PaperFlow/
 │   ├── app/               # 页面组件
 │   │   ├── papers/        # 论文列表页
 │   │   ├── workspaces/    # 团队空间页
-│   │   └── admin/         # 管理员页（含存储统计、翻译配置）
+│   │   ├── admin/         # 管理员页（含存储统计、翻译配置）
+│   │   └── globals.css    # Fluent 2 设计系统样式
 │   ├── components/        # 可复用组件
 │   │   ├── AdvancedSearch.tsx     # 高级搜索组件
 │   │   ├── TranslationPanel.tsx   # 翻译面板组件
 │   │   ├── TranslationMonitor.tsx # 翻译监控组件
 │   │   ├── DownloadButtons.tsx    # 下载按钮组件
-│   │   └── MarkdownRenderer.tsx
+│   │   ├── MarkdownRenderer.tsx   # Markdown 渲染组件
+│   │   ├── ui/                    # UI 基础组件
+│   │   │   ├── Toast.tsx          # Toast 通知组件
+│   │   │   └── DropdownMenu.tsx   # 下拉菜单组件
+│   │   └── markdown/              # Markdown 渲染系统
+│   │       ├── AcademicMarkdownRenderer.tsx  # 学术 Markdown 渲染器
+│   │       └── renderers/         # 自定义渲染器（代码、数学公式等）
 │   └── lib/api.ts         # API 客户端
 ├── uploads/               # 文件存储目录
 │   └── papers/            # PDF 文件（按用户目录存储）

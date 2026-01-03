@@ -182,6 +182,9 @@ class TranslationLLMProvider(Base):
     model = Column(String(100), nullable=True)              # 模型名称
     priority = Column(Integer, default=100)                 # 优先级（数字越小优先级越高）
     qps = Column(Integer, default=4)                        # 每秒请求数限制
+    pool_max_workers = Column(Integer, nullable=True)       # 最大工作线程数（默认为 qps * 10）
+    no_auto_extract_glossary = Column(Boolean, default=False)  # 禁用自动术语提取（加速翻译）
+    disable_rich_text_translate = Column(Boolean, default=False)  # 禁用富文本翻译（加速但丢失格式）
     enabled = Column(Boolean, default=True)                 # 是否启用
     created_at = Column(String(50), default=lambda: datetime.now().isoformat())
 

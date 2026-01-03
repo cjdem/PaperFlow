@@ -128,16 +128,25 @@ class TranslationService:
                 openai_compatible_model=provider.model or "gpt-4o-mini",
             )
         
+        # 计算 pool_max_workers（如果未设置，默认为 qps * 10，但不超过 1000）
+        qps_value = provider.qps if provider.qps else self.qps
+        pool_workers = provider.pool_max_workers
+        if not pool_workers:
+            pool_workers = min(qps_value * 10, 1000)
+        
         # 构建完整的 SettingsModel
         settings = SettingsModel(
             translation=TranslationSettings(
                 lang_in=self.lang_in,
                 lang_out=self.lang_out,
                 output=output_dir,
-                qps=provider.qps if provider.qps else self.qps,
+                qps=qps_value,
+                pool_max_workers=pool_workers,
+                no_auto_extract_glossary=provider.no_auto_extract_glossary if provider.no_auto_extract_glossary else False,
             ),
             pdf=PDFSettings(
                 max_pages_per_part=self.max_pages_per_part,
+                disable_rich_text_translate=provider.disable_rich_text_translate if provider.disable_rich_text_translate else False,
             ),
             translate_engine_settings=translate_engine_settings,
         )

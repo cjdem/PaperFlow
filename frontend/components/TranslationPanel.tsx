@@ -174,16 +174,16 @@ export default function TranslationPanel({
 
   if (!hasFile) {
     return (
-      <div className="bg-gray-800 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-white mb-2">📄 论文翻译</h3>
-        <p className="text-gray-400 text-sm">此论文没有关联的 PDF 文件，无法翻译</p>
+      <div className="fluent-card p-5">
+        <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-2">📄 论文翻译</h3>
+        <p className="text-[var(--fluent-foreground-secondary)] text-sm">此论文没有关联的 PDF 文件，无法翻译</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <h3 className="text-lg font-semibold text-white mb-4">📄 论文翻译</h3>
+    <div className="fluent-card p-5">
+      <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-4">📄 论文翻译</h3>
       
       {/* 状态显示 */}
       <div className="mb-4">
@@ -198,12 +198,15 @@ export default function TranslationPanel({
       {/* 进度条 */}
       {status?.status === 'processing' && (
         <div className="mb-4">
-          <div className="w-full bg-gray-700 rounded-full h-2">
+          <div className="fluent-progress h-2">
             <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className="fluent-progress-bar h-2"
               style={{ width: `${status.progress}%` }}
             />
           </div>
+          <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-2">
+            正在翻译中，请稍候...
+          </p>
         </div>
       )}
 
@@ -212,11 +215,11 @@ export default function TranslationPanel({
         <div className="space-y-3">
           {providers.length > 0 && (
             <div>
-              <label className="block text-gray-400 text-sm mb-1">翻译引擎</label>
+              <label className="block text-[var(--fluent-foreground-secondary)] text-sm mb-2 font-medium">翻译引擎</label>
               <select
                 value={selectedProvider || ''}
                 onChange={(e) => setSelectedProvider(e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm"
+                className="fluent-select w-full"
               >
                 <option value="">自动选择</option>
                 {providers.map(p => (
@@ -231,9 +234,14 @@ export default function TranslationPanel({
           <button
             onClick={startTranslation}
             disabled={loading}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="fluent-button fluent-button-accent w-full py-2.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? '添加中...' : '🚀 开始翻译'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                添加中...
+              </span>
+            ) : '🚀 开始翻译'}
           </button>
           
           {error && (
@@ -244,8 +252,8 @@ export default function TranslationPanel({
 
       {/* 下载按钮 */}
       {status?.status === 'completed' && (
-        <div className="space-y-2">
-          <p className="text-gray-400 text-sm mb-2">📥 下载翻译结果</p>
+        <div className="space-y-3">
+          <p className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">📥 下载翻译结果</p>
           <DownloadButtons
             paperId={paperId}
             paperTitle={paperTitle}
@@ -253,7 +261,7 @@ export default function TranslationPanel({
             translationStatus={status.status}
           />
           {status.translated_at && (
-            <p className="text-gray-500 text-xs mt-2">
+            <p className="text-[var(--fluent-foreground-secondary)] text-xs mt-2 opacity-70">
               翻译完成于: {new Date(status.translated_at).toLocaleString()}
             </p>
           )}
@@ -262,9 +270,10 @@ export default function TranslationPanel({
 
       {/* 等待中状态 */}
       {status?.status === 'pending' && (
-        <p className="text-gray-400 text-sm">
+        <div className="flex items-center gap-3 text-[var(--fluent-foreground-secondary)] text-sm">
+          <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
           论文已加入翻译队列，请等待处理...
-        </p>
+        </div>
       )}
     </div>
   );

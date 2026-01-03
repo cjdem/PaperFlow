@@ -359,6 +359,9 @@ class TranslationProviderCreate(BaseModel):
     model: Optional[str] = None
     priority: int = 100
     qps: int = 4
+    pool_max_workers: Optional[int] = None  # 最大工作线程数（默认为 qps * 10）
+    no_auto_extract_glossary: bool = False  # 禁用自动术语提取（加速翻译）
+    disable_rich_text_translate: bool = False  # 禁用富文本翻译（加速但丢失格式）
     enabled: bool = True
 
 
@@ -371,6 +374,9 @@ class TranslationProviderResponse(BaseModel):
     model: Optional[str] = None
     priority: int
     qps: int
+    pool_max_workers: Optional[int] = None
+    no_auto_extract_glossary: bool = False
+    disable_rich_text_translate: bool = False
     enabled: bool
     created_at: str
 

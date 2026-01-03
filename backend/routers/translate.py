@@ -357,6 +357,9 @@ async def get_translation_providers(
                 "model": p.model,
                 "priority": p.priority,
                 "qps": p.qps,
+                "pool_max_workers": p.pool_max_workers,
+                "no_auto_extract_glossary": p.no_auto_extract_glossary,
+                "disable_rich_text_translate": p.disable_rich_text_translate,
                 "enabled": p.enabled,
                 "created_at": p.created_at,
                 "has_api_key": bool(p.api_key and len(p.api_key) > 0)  # 显示是否已配置 API Key
@@ -381,6 +384,9 @@ async def create_translation_provider(
         model=request.model,
         priority=request.priority,
         qps=request.qps,
+        pool_max_workers=request.pool_max_workers,
+        no_auto_extract_glossary=request.no_auto_extract_glossary,
+        disable_rich_text_translate=request.disable_rich_text_translate,
         enabled=request.enabled
     )
     db.add(provider)
@@ -413,6 +419,9 @@ async def update_translation_provider(
     provider.model = request.model
     provider.priority = request.priority
     provider.qps = request.qps
+    provider.pool_max_workers = request.pool_max_workers
+    provider.no_auto_extract_glossary = request.no_auto_extract_glossary
+    provider.disable_rich_text_translate = request.disable_rich_text_translate
     provider.enabled = request.enabled
     
     db.commit()
