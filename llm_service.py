@@ -22,6 +22,7 @@ def get_all_providers(pool_type: str = None) -> list[dict]:
                 "id": p.id,
                 "name": p.name,
                 "base_url": p.base_url,
+                "proxy": getattr(p, "proxy", None),
                 "api_key": p.api_key,
                 "pool_type": p.pool_type,
                 "api_type": getattr(p, 'api_type', 'openai'),
@@ -56,6 +57,7 @@ def get_enabled_providers(pool_type: str) -> list[dict]:
                 "id": p.id,
                 "name": p.name,
                 "base_url": p.base_url,
+                "proxy": getattr(p, "proxy", None),
                 "api_key": p.api_key,
                 "api_type": getattr(p, 'api_type', 'openai'),
                 "models": p.models,
@@ -97,7 +99,8 @@ def mark_provider_failure(provider_id: int, error: str) -> None:
 
 
 def add_provider(name: str, base_url: str, api_key: str, pool_type: str, 
-                 models: str, is_primary: bool = False, weight: int = 10, api_type: str = "openai") -> int:
+                 models: str, is_primary: bool = False, weight: int = 10, api_type: str = "openai",
+                 proxy: str | None = None) -> int:
     """添加新的提供商"""
     with get_db_session() as session:
         # 如果设置为主模型，先取消其他主模型
@@ -110,6 +113,7 @@ def add_provider(name: str, base_url: str, api_key: str, pool_type: str,
             name=name,
             base_url=base_url,
             api_key=api_key,
+            proxy=proxy,
             pool_type=pool_type,
             api_type=api_type,
             models=models,
@@ -214,6 +218,7 @@ def import_from_json(json_path: str = "llm_config.json") -> int:
                 is_primary=(i == 0),  # 第一个设为主模型
                 weight=entry.get("weight", 10),  # 使用权重
                 api_type=entry.get("api_type", "openai"),  # 读取 api_type，默认 openai
+                proxy=entry.get("proxy", None),
             )
             count += 1
     

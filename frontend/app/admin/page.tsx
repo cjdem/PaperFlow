@@ -34,6 +34,7 @@ interface LLMProvider {
     id: number;
     name: string;
     base_url: string;
+    proxy?: string | null;
     api_key: string;
     models: string;
     api_type: string;
@@ -51,6 +52,7 @@ interface LLMProvider {
 const createEmptyProvider = (poolType: string): Omit<LLMProvider, 'id' | 'is_primary'> => ({
     name: '',
     base_url: '',
+    proxy: '',
     api_key: '',
     models: '',
     api_type: 'openai',
@@ -161,6 +163,7 @@ export default function AdminPage() {
         setFormData({
             name: p.name,
             base_url: p.base_url,
+            proxy: p.proxy || '',
             api_key: p.api_key,
             models: p.models,
             api_type: p.api_type,
@@ -344,6 +347,17 @@ export default function AdminPage() {
                             className="fluent-input w-full"
                         />
                         <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-1.5">💡 提示：{apiInfo.urlHint}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">Proxy（可选）</label>
+                        <input
+                            type="text"
+                            value={formData.proxy || ''}
+                            onChange={e => setFormData({ ...formData, proxy: e.target.value })}
+                            placeholder="http://127.0.0.1:7890"
+                            className="fluent-input w-full"
+                        />
+                        <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-1.5">💡 支持 http/https 代理，留空则不使用</p>
                     </div>
                     <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">API Key</label>

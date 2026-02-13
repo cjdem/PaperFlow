@@ -314,7 +314,8 @@ async def task_analyze_paper(full_text, timeout_seconds: float = 300.0, use_stre
                 llm_manager.chat_stream(
                     pool_name="analysis",
                     messages=messages,
-                    temperature=0.2
+                    temperature=0.2,
+                    response_format={"type": "text"}
                 ),
                 timeout=timeout_seconds
             )
@@ -332,6 +333,7 @@ async def task_analyze_paper(full_text, timeout_seconds: float = 300.0, use_stre
                     pool_name="analysis",
                     messages=messages,
                     temperature=0.2,
+                    response_format={"type": "text"},
                     validator=_validate_analysis
                 ),
                 timeout=timeout_seconds

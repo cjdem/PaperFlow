@@ -28,6 +28,7 @@ def run():
     _add_column_if_missing("llm_providers", "last_failure_at", "VARCHAR(50)")
     _add_column_if_missing("llm_providers", "last_error", "TEXT")
     _add_column_if_missing("llm_providers", "avg_latency_ms", "INTEGER")
+    _add_column_if_missing("llm_providers", "proxy", "VARCHAR(500)")
 
 
 if __name__ == "__main__":

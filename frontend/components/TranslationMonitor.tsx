@@ -104,6 +104,7 @@ export default function TranslationMonitor() {
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [formData, setFormData] = useState<ProviderFormData>(createEmptyFormData());
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [testingProviderId, setTestingProviderId] = useState<number | null>(null);
 
   // 获取队列统计
   const fetchStats = useCallback(async () => {
@@ -264,6 +265,29 @@ export default function TranslationMonitor() {
       enabled: !provider.enabled
     });
     fetchProviders();
+  };
+
+  const testProvider = async (provider: Provider) => {
+    setTestingProviderId(provider.id);
+    try {
+      const res = await apiClient.post<{
+        success: boolean;
+        message: string;
+        latency_ms?: number;
+        engine_type?: string;
+        model?: string;
+        sample?: string;
+      }>(`/api/translate/providers/${provider.id}/test`);
+
+      const latencyText = res.latency_ms !== undefined ? `（${res.latency_ms}ms）` : '';
+      const modelText = res.model ? `模型: ${res.model}` : '';
+      alert(`✅ ${res.message}${latencyText}${modelText ? `\n${modelText}` : ''}`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '测试失败';
+      alert(`❌ ${msg}`);
+    } finally {
+      setTestingProviderId(null);
+    }
   };
 
   // 获取状态标签样式
@@ -753,6 +777,17 @@ export default function TranslationMonitor() {
                             className="px-3 py-1.5 text-sm bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600/30 transition font-medium"
                           >
                             ✏️ 编辑
+                          </button>
+                          <button
+                            onClick={() => testProvider(provider)}
+                            disabled={testingProviderId === provider.id}
+                            className={`px-3 py-1.5 text-sm rounded-lg transition font-medium ${
+                              testingProviderId === provider.id
+                                ? 'bg-purple-400/30 text-purple-200 cursor-wait'
+                                : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                            }`}
+                          >
+                            {testingProviderId === provider.id ? '🔌 测试中...' : '🔌 测试连接'}
                           </button>
                           <button
                             onClick={() => deleteProvider(provider.id)}

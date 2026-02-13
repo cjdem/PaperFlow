@@ -128,6 +128,7 @@ class LLMProviderResponse(BaseModel):
     name: str
     base_url: str
     api_key: str  # 前端需要展示（已加密）
+    proxy: Optional[str] = None
     pool_type: str
     api_type: str
     is_primary: bool
@@ -148,6 +149,7 @@ class CreateLLMProviderRequest(BaseModel):
     name: str
     base_url: str
     api_key: str
+    proxy: Optional[str] = None
     pool_type: str
     api_type: str = "openai"
     models: str
@@ -160,6 +162,7 @@ class UpdateLLMProviderRequest(BaseModel):
     name: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+    proxy: Optional[str] = None
     models: Optional[str] = None
     api_type: Optional[str] = None
     pool_type: Optional[str] = None

@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from db_models import Paper, User, TranslationLLMProvider, TranslationQueue, TranslationLog, Session as DBSession
 from deps import get_db, get_current_user, get_current_admin, get_user_from_token
 from audit_service import log_audit_event
+from translation_service import translation_service
 from schemas import (
     TranslateRequest, BatchTranslateRequest, TranslateStatusResponse,
     TranslationQueueStats, TranslationProviderCreate, TranslationProviderResponse
@@ -430,6 +431,36 @@ async def get_translation_providers(
             for p in providers
         ]
     }
+
+
+@router.post("/providers/{provider_id}/test")
+async def test_translation_provider(
+    provider_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """测试翻译 LLM 提供商连通性"""
+    provider = db.query(TranslationLLMProvider).filter(
+        TranslationLLMProvider.id == provider_id
+    ).first()
+
+    if not provider:
+        raise HTTPException(status_code=404, detail="提供商不存在")
+
+    engine_type = (provider.engine_type or "").lower()
+    requires_api_key = engine_type not in ["google", "ollama"]
+    if requires_api_key and not (provider.api_key and provider.api_key.strip()):
+        raise HTTPException(status_code=400, detail="API Key 为空，无法测试")
+
+    db.expunge(provider)
+
+    try:
+        return await translation_service.test_provider_connectivity(provider)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_text = str(e) or "未知错误"
+        raise HTTPException(status_code=502, detail=f"测试失败: {error_text[:300]}")
 
 
 @router.post("/providers")

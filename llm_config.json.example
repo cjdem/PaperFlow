@@ -5,21 +5,24 @@
       "api_key": "sk-your-openai-api-key-here",
       "model": "gpt-4o-mini",
       "priority": 1,
-      "api_type": "openai"
+      "api_type": "openai",
+      "proxy": ""
     },
     {
       "base_url": "https://generativelanguage.googleapis.com/v1beta",
       "api_key": "your-gemini-api-key-here",
       "model": "gemini-2.0-flash-exp",
       "priority": 2,
-      "api_type": "gemini"
+      "api_type": "gemini",
+      "proxy": ""
     },
     {
       "base_url": "https://api.deepseek.com/v1",
       "api_key": "sk-your-deepseek-api-key-here",
       "model": "deepseek-chat",
       "priority": 3,
-      "api_type": "openai"
+      "api_type": "openai",
+      "proxy": ""
     }
   ],
   "analysis_pool": [
@@ -28,21 +31,24 @@
       "api_key": "sk-your-openai-api-key-here",
       "model": "gpt-4o",
       "priority": 1,
-      "api_type": "openai"
+      "api_type": "openai",
+      "proxy": ""
     },
     {
       "base_url": "https://generativelanguage.googleapis.com/v1beta",
       "api_key": "your-gemini-api-key-here",
       "model": "gemini-2.0-flash-thinking-exp",
       "priority": 1,
-      "api_type": "gemini"
+      "api_type": "gemini",
+      "proxy": ""
     },
     {
       "base_url": "https://api.anthropic.com",
       "api_key": "sk-ant-your-claude-api-key-here",
       "model": "claude-3-5-sonnet-20241022",
       "priority": 2,
-      "api_type": "anthropic"
+      "api_type": "anthropic",
+      "proxy": ""
     }
   ],
   "_comments": {
@@ -52,6 +58,7 @@
     "字段说明": {
       "base_url": "API 端点地址",
       "api_key": "API 密钥",
+      "proxy": "可选代理地址（http:// 或 https://），留空不使用",
       "model": "模型名称，支持逗号分隔多个模型",
       "priority": "优先级（1为最高），数值越小越优先尝试",
       "api_type": "API 类型，可选值: 'openai', 'gemini' 或 'anthropic'"

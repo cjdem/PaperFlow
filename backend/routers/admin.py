@@ -12,7 +12,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
-from llm_pool import llm_manager, GeminiClientWrapper, AnthropicClientWrapper
+from llm_pool import llm_manager, GeminiClientWrapper, AnthropicClientWrapper, build_httpx_client
 from file_service import file_service
 
 from deps import get_db, get_current_admin
@@ -57,6 +57,7 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
     api_type = (provider.api_type or "openai").lower()
     base_url = (provider.base_url or "").strip()
     base_url = base_url.rstrip("/") if base_url else None
+    proxy = (getattr(provider, "proxy", None) or "").strip() or None
 
     if not api_key:
         raise HTTPException(status_code=400, detail="API Key 为空，无法测试")
@@ -67,33 +68,61 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
     start_time = time.monotonic()
 
     try:
+        response_format = {"type": "text"}
+
         if api_type == "gemini":
-            client = GeminiClientWrapper(api_key=api_key, base_url=base_url)
+            client = GeminiClientWrapper(api_key=api_key, base_url=base_url, proxy=proxy)
             response = await client.create_chat_completion(
                 model=model,
                 messages=messages,
-                temperature=0
+                temperature=0,
+                response_format=response_format
             )
         elif api_type == "anthropic":
-            client = AnthropicClientWrapper(api_key=api_key, base_url=base_url)
+            client = AnthropicClientWrapper(api_key=api_key, base_url=base_url, proxy=proxy)
             response = await client.create_chat_completion(
                 model=model,
                 messages=messages,
                 temperature=0,
-                max_tokens=32
+                max_tokens=32,
+                response_format=response_format
             )
         else:
-            client = AsyncOpenAI(
-                api_key=api_key,
-                base_url=base_url,
-                timeout=httpx.Timeout(30.0, connect=10.0)
-            )
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0,
-                max_tokens=16
-            )
+            timeout = httpx.Timeout(30.0, connect=10.0)
+            if proxy:
+                http_client = build_httpx_client(timeout, proxy)
+                client = AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    http_client=http_client
+                )
+            else:
+                client = AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=timeout
+                )
+            kwargs = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0,
+                "max_tokens": 16,
+                "response_format": response_format
+            }
+            try:
+                response = await client.chat.completions.create(**kwargs)
+            except APIStatusError as api_error:
+                status_code = getattr(getattr(api_error, "response", None), "status_code", None)
+                combined = (str(api_error) + " " + str(getattr(api_error, "body", ""))).lower()
+                if response_format and status_code in (400, 403) and (
+                    "response_format" in combined or "json_object" in combined
+                ):
+                    fallback_kwargs = dict(kwargs)
+                    fallback_kwargs.pop("response_format", None)
+                    _logger.warning(f"⚠️ {provider.id} 不支持 response_format，已降级重试")
+                    response = await client.chat.completions.create(**fallback_kwargs)
+                else:
+                    raise
 
         latency_ms = int((time.monotonic() - start_time) * 1000)
         mark_provider_success(provider.id, latency_ms)
@@ -184,6 +213,7 @@ async def get_llm_providers(
             name=p.name,
             base_url=p.base_url,
             api_key=p.api_key,
+            proxy=getattr(p, "proxy", None),
             pool_type=p.pool_type,
             api_type=getattr(p, 'api_type', 'openai'),
             is_primary=p.is_primary,
@@ -218,6 +248,7 @@ async def create_llm_provider(
         name=request.name,
         base_url=request.base_url,
         api_key=request.api_key,
+        proxy=request.proxy,
         pool_type=request.pool_type,
         api_type=request.api_type,
         models=request.models,
@@ -236,6 +267,7 @@ async def create_llm_provider(
         name=provider.name,
         base_url=provider.base_url,
         api_key=provider.api_key,
+        proxy=getattr(provider, "proxy", None),
         pool_type=provider.pool_type,
         api_type=provider.api_type,
         is_primary=provider.is_primary,
@@ -277,6 +309,7 @@ async def update_llm_provider(
         name=provider.name,
         base_url=provider.base_url,
         api_key=provider.api_key,
+        proxy=getattr(provider, "proxy", None),
         pool_type=provider.pool_type,
         api_type=getattr(provider, 'api_type', 'openai'),
         is_primary=provider.is_primary,

@@ -5,6 +5,7 @@
 
 import os
 import asyncio
+import time
 from pathlib import Path
 from typing import Optional, AsyncGenerator, Dict, Any
 from datetime import datetime
@@ -176,6 +177,46 @@ class TranslationService:
             logger.error(f"写入翻译日志失败: {e}")
         finally:
             session.close()
+
+    async def test_provider_connectivity(self, provider: TranslationLLMProvider) -> Dict[str, Any]:
+        """
+        测试翻译提供商连通性
+
+        Args:
+            provider: 翻译 LLM 提供商
+
+        Returns:
+            测试结果字典
+        """
+        output_dir = str(Path(settings.file_storage_path).resolve())
+        os.makedirs(output_dir, exist_ok=True)
+
+        sample_text = "Hello"
+        start_time = time.monotonic()
+
+        def _run_test() -> str:
+            settings_model = self._build_settings(provider, output_dir)
+            from pdf2zh_next.translator import get_translator
+            translator = get_translator(settings_model)
+            return translator.translate(sample_text, ignore_cache=True)
+
+        result = await asyncio.to_thread(_run_test)
+        latency_ms = int((time.monotonic() - start_time) * 1000)
+        sample = ""
+        if result is not None:
+            try:
+                sample = str(result)
+            except Exception:
+                sample = ""
+
+        return {
+            "success": True,
+            "message": "联通成功",
+            "latency_ms": latency_ms,
+            "engine_type": provider.engine_type,
+            "model": provider.model,
+            "sample": sample[:200]
+        }
     
     def get_provider(self, provider_id: Optional[int] = None) -> Optional[TranslationLLMProvider]:
         """

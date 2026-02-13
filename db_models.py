@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, JSON, Table, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Text, JSON, Table, ForeignKey, Boolean, UniqueConstraint, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
 
@@ -78,6 +78,7 @@ class LLMProvider(Base):
     name = Column(String(100), nullable=False)
     base_url = Column(String(255), nullable=False)
     api_key = Column(Text, nullable=False)
+    proxy = Column(String(500), nullable=True)
     pool_type = Column(String(20), nullable=False)
     api_type = Column(String(20), default="openai")  # openai 或 gemini
     is_primary = Column(Boolean, default=False)
@@ -256,4 +257,21 @@ DB_URL = settings.db_url
 
 engine = create_engine(DB_URL)
 Base.metadata.create_all(engine)
+
+def _add_column_if_missing(table: str, column: str, column_type: str):
+    try:
+        inspector = inspect(engine)
+        if table not in inspector.get_table_names():
+            return
+        columns = [c["name"] for c in inspector.get_columns(table)]
+        if column in columns:
+            return
+        with engine.begin() as conn:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
+    except Exception:
+        return
+
+# 兼容旧数据库：为 llm_providers 增加 proxy 列（若缺失）
+_add_column_if_missing("llm_providers", "proxy", "VARCHAR(500)")
+
 Session = sessionmaker(bind=engine)

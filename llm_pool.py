@@ -10,6 +10,7 @@ import random
 import asyncio
 import httpx
 import time
+import inspect
 from openai import AsyncOpenAI, APIStatusError
 from llm_service import get_enabled_providers, import_from_json, mark_provider_success, mark_provider_failure
 from db_service import get_config
@@ -19,15 +20,27 @@ from settings import settings
 logger = get_logger("llm_pool")
 
 
+def build_httpx_client(timeout: httpx.Timeout, proxy: str | None) -> httpx.AsyncClient:
+    kwargs = {}
+    if proxy:
+        params = inspect.signature(httpx.AsyncClient).parameters
+        if "proxy" in params:
+            kwargs["proxy"] = proxy
+        elif "proxies" in params:
+            kwargs["proxies"] = proxy
+    return httpx.AsyncClient(timeout=timeout, **kwargs)
+
+
 class GeminiClientWrapper:
     """
     Gemini API 客户端包装器
     支持自定义 base_url（如中转服务）
     """
-    def __init__(self, api_key: str, base_url: str = None):
+    def __init__(self, api_key: str, base_url: str = None, proxy: str | None = None):
         self.api_key = api_key
         # 默认使用 Google 官方 API，也支持自定义地址
         self.base_url = base_url.rstrip("/") if base_url else "https://generativelanguage.googleapis.com/v1beta"
+        self.proxy = proxy
     
     async def create_chat_completion(self, model: str, messages: list, temperature: float = 0.7, **kwargs):
         """调用 Gemini API 并返回 OpenAI 兼容的响应格式"""
@@ -62,7 +75,7 @@ class GeminiClientWrapper:
         
         # 发送请求 - 使用更细粒度的超时配置
         timeout = httpx.Timeout(300.0, connect=30.0)  # 总超时5分钟，连接超时30秒
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with build_httpx_client(timeout, self.proxy) as client:
             response = await client.post(url, json=request_body)
             response.raise_for_status()
             data = response.json()
@@ -105,9 +118,10 @@ class AnthropicClientWrapper:
     Anthropic API 客户端包装器
     支持自定义 base_url（如中转服务）
     """
-    def __init__(self, api_key: str, base_url: str = None):
+    def __init__(self, api_key: str, base_url: str = None, proxy: str | None = None):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/") if base_url else "https://api.anthropic.com"
+        self.proxy = proxy
     
     async def create_chat_completion(self, model: str, messages: list, temperature: float = 0.7, **kwargs):
         """调用 Anthropic API 并返回 OpenAI 兼容的响应格式"""
@@ -146,7 +160,7 @@ class AnthropicClientWrapper:
         }
         
         timeout = httpx.Timeout(300.0, connect=30.0)  # 总超时5分钟，连接超时30秒
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with build_httpx_client(timeout, self.proxy) as client:
             response = await client.post(url, json=request_body, headers=headers)
             response.raise_for_status()
             data = response.json()
@@ -220,6 +234,7 @@ class LLMManager:
 
         for entry in providers:
             base_url = entry.get("base_url", "").strip()
+            proxy = (entry.get("proxy") or "").strip() or None
             keys = [k.strip() for k in entry.get("api_key", "").split(",") if k.strip()]
             models = [m.strip() for m in entry.get("models", "").split(",") if m.strip()]
             weight = entry.get("weight", 10)
@@ -228,15 +243,24 @@ class LLMManager:
             for key in keys:
                 # 根据 api_type 创建不同的客户端
                 if api_type == "gemini":
-                    client = GeminiClientWrapper(api_key=key, base_url=base_url or None)
+                    client = GeminiClientWrapper(api_key=key, base_url=base_url or None, proxy=proxy)
                 elif api_type == "anthropic":
-                    client = AnthropicClientWrapper(api_key=key, base_url=base_url or None)
+                    client = AnthropicClientWrapper(api_key=key, base_url=base_url or None, proxy=proxy)
                 else:  # 默认 openai - 添加超时配置
-                    client = AsyncOpenAI(
-                        api_key=key,
-                        base_url=base_url,
-                        timeout=httpx.Timeout(300.0, connect=30.0)  # 总超时5分钟，连接超时30秒
-                    )
+                    timeout = httpx.Timeout(300.0, connect=30.0)
+                    if proxy:
+                        http_client = build_httpx_client(timeout, proxy)
+                        client = AsyncOpenAI(
+                            api_key=key,
+                            base_url=base_url,
+                            http_client=http_client
+                        )
+                    else:
+                        client = AsyncOpenAI(
+                            api_key=key,
+                            base_url=base_url,
+                            timeout=timeout  # 总超时5分钟，连接超时30秒
+                        )
                 
                 for model_index, model in enumerate(models):
                     provider = base_url.split("//")[-1].split("/")[0] if base_url else "googleapis.com"
@@ -249,6 +273,7 @@ class LLMManager:
                         "weight": weight,
                         "priority": entry.get("priority", 1),
                         "model_index": model_index,  # 模型在列表中的索引，用于保证同一提供商内的模型按顺序调用
+                        "proxy": proxy,
                         "id": f"[{model}] @ {provider}",
                         "provider_db_id": entry.get("id"),
                     })
@@ -281,7 +306,7 @@ class LLMManager:
         except (ValueError, TypeError):
             return settings.llm_max_retries
 
-    async def chat(self, pool_name: str, messages: list, response_format=None, 
+    async def chat(self, pool_name: str, messages: list, response_format=None,
                    temperature: float = 0.7, validator=None):
         """
         调用 LLM，支持:
@@ -315,13 +340,15 @@ class LLMManager:
                         response = await node["client"].create_chat_completion(
                             model=node["model"],
                             messages=messages,
-                            temperature=temperature
+                            temperature=temperature,
+                            response_format=response_format
                         )
                     elif node["api_type"] == "anthropic":
                         response = await node["client"].create_chat_completion(
                             model=node["model"],
                             messages=messages,
-                            temperature=temperature
+                            temperature=temperature,
+                            response_format=response_format
                         )
                     else:  # OpenAI
                         kwargs = {
@@ -386,7 +413,7 @@ class LLMManager:
         raise last_error or ValueError("所有 LLM 通道均不可用")
 
     async def chat_stream(self, pool_name: str, messages: list,
-                          temperature: float = 0.7, on_chunk=None):
+                          temperature: float = 0.7, on_chunk=None, response_format=None):
         """
         流式调用 LLM，支持:
           - 顺序故障转移 (按 priority 顺序)
@@ -433,13 +460,15 @@ class LLMManager:
                             response = await node["client"].create_chat_completion(
                                 model=node["model"],
                                 messages=messages,
-                                temperature=temperature
+                                temperature=temperature,
+                                response_format=response_format
                             )
                         elif node["api_type"] == "anthropic":
                             response = await node["client"].create_chat_completion(
                                 model=node["model"],
                                 messages=messages,
-                                temperature=temperature
+                                temperature=temperature,
+                                response_format=response_format
                             )
                         content = response.choices[0].message.content
                         if on_chunk:
@@ -451,12 +480,28 @@ class LLMManager:
                     
                     # OpenAI 流式调用
                     full_content = ""
-                    stream = await node["client"].chat.completions.create(
-                        model=node["model"],
-                        messages=messages,
-                        temperature=temperature,
-                        stream=True
-                    )
+                    stream_kwargs = {
+                        "model": node["model"],
+                        "messages": messages,
+                        "temperature": temperature,
+                        "stream": True
+                    }
+                    if response_format:
+                        stream_kwargs["response_format"] = response_format
+                    try:
+                        stream = await node["client"].chat.completions.create(**stream_kwargs)
+                    except APIStatusError as api_error:
+                        status_code = getattr(getattr(api_error, "response", None), "status_code", None)
+                        combined = (str(api_error) + " " + str(getattr(api_error, "body", ""))).lower()
+                        if response_format and status_code in (400, 403) and (
+                            "response_format" in combined or "json_object" in combined
+                        ):
+                            fallback_kwargs = dict(stream_kwargs)
+                            fallback_kwargs.pop("response_format", None)
+                            logger.warning(f"⚠️ {provider_id} 不支持 response_format，已降级重试")
+                            stream = await node["client"].chat.completions.create(**fallback_kwargs)
+                        else:
+                            raise
                     
                     async for chunk in stream:
                         if chunk.choices and chunk.choices[0].delta.content:
