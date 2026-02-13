@@ -18,11 +18,11 @@ from sqlalchemy.orm import Session
 # 添加父目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from db_models import Paper, User, TranslationLLMProvider, TranslationQueue, TranslationLog, Session as DBSession
+from backend.core.db_models import Paper, User, TranslationLLMProvider, TranslationQueue, TranslationLog, Session as DBSession
 from deps import get_db, get_current_user, get_current_admin, get_user_from_token
-from audit_service import log_audit_event
-from translation_service import translation_service
-from llm_format import normalize_translation_request_format
+from backend.core.audit_service import log_audit_event
+from backend.core.translation_service import translation_service
+from backend.core.llm_format import normalize_translation_request_format
 from schemas import (
     TranslateRequest, BatchTranslateRequest, TranslateStatusResponse,
     TranslationQueueStats, TranslationProviderCreate, TranslationProviderResponse
@@ -51,7 +51,7 @@ async def start_translation(
         raise HTTPException(status_code=403, detail="无权翻译此论文")
     
     # 检查是否有原始 PDF
-    from file_service import file_service
+    from backend.core.file_service import file_service
     
     pdf_path = file_service.resolve_paper_file_path(
         relative_path=paper.file_path,
@@ -77,7 +77,7 @@ async def start_translation(
         db.commit()
     
     # 添加到翻译队列
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     try:
         task = translation_queue_manager.add_to_queue(
@@ -105,7 +105,7 @@ async def batch_translate(
     db: Session = Depends(get_db)
 ):
     """批量添加翻译任务（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     result = translation_queue_manager.batch_add_to_queue(
         paper_ids=request.paper_ids,
@@ -247,7 +247,7 @@ async def download_translated_pdf(
     if current_user.role != "admin" and paper.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权下载此论文")
     
-    from file_service import file_service
+    from backend.core.file_service import file_service
     
     # 清理论文标题作为文件名
     base_name = sanitize_filename(paper.title or 'paper')
@@ -349,7 +349,7 @@ async def get_queue_stats(
     db: Session = Depends(get_db)
 ):
     """获取翻译队列统计（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     stats = translation_queue_manager.get_queue_stats()
     return TranslationQueueStats(**stats)
@@ -363,7 +363,7 @@ async def get_queue_tasks(
     db: Session = Depends(get_db)
 ):
     """获取翻译队列任务列表（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     tasks = translation_queue_manager.get_tasks(status=status, limit=limit)
     return {"tasks": tasks}
@@ -375,7 +375,7 @@ async def start_translation_worker(
     current_user: User = Depends(get_current_admin)
 ):
     """启动翻译工作线程（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     if translation_queue_manager.is_running:
         return {"message": "翻译工作线程已在运行"}
@@ -389,7 +389,7 @@ async def stop_translation_worker(
     current_user: User = Depends(get_current_admin)
 ):
     """停止翻译工作线程（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     translation_queue_manager.stop_worker()
     return {"message": "翻译工作线程已停止"}
@@ -402,7 +402,7 @@ async def cancel_translation_task(
     db: Session = Depends(get_db)
 ):
     """取消翻译任务（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     
     success = translation_queue_manager.cancel_task(task_id)
     if success:
@@ -418,7 +418,7 @@ async def retry_translation_task(
     current_user: User = Depends(get_current_admin)
 ):
     """手动重试翻译任务（管理员）"""
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
 
     result = translation_queue_manager.retry_task(task_id=task_id, force=force)
     if result.get("success"):
@@ -600,3 +600,4 @@ async def delete_translation_provider(
     db.delete(provider)
     db.commit()
     return {"message": "删除成功"}
+

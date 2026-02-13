@@ -86,13 +86,13 @@ async def health():
 async def startup_event():
     """应用启动时执行"""
     # 从 JSON 导入 LLM 配置（如果数据库为空）
-    from llm_service import import_from_json
+    from backend.core.llm_service import import_from_json
     count = import_from_json()
     if count > 0:
         print(f"从 llm_config.json 导入了 {count} 个 LLM 提供商")
 
     # 恢复中断的翻译任务并自动启动翻译 worker
-    from translation_queue import translation_queue_manager
+    from backend.core.translation_queue import translation_queue_manager
     recovery = translation_queue_manager.recover_incomplete_tasks_on_startup()
     logger.info(
         "翻译任务恢复结果: recovered=%s, failed=%s, orphaned_papers=%s",
@@ -102,3 +102,4 @@ async def startup_event():
     )
     if not translation_queue_manager.is_running:
         asyncio.create_task(translation_queue_manager.start_worker())
+

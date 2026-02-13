@@ -17,9 +17,15 @@ root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.insert(0, root_dir)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db_models import Paper, User
-from utils import calculate_md5
-from file_service import file_service
+from backend.core.db_models import Paper, User
+from backend.core.utils import calculate_md5
+from backend.core.file_service import file_service
+from backend.services.paper_pipeline import (
+    extract_pdf_content,
+    task_extract_metadata,
+    task_analyze_paper,
+    normalize_title,
+)
 
 from deps import get_db, get_current_user
 
@@ -28,21 +34,8 @@ router = APIRouter(prefix="/api/upload-stream", tags=["上传流"])
 
 async def process_with_progress(file_content: bytes, filename: str, md5: str, owner_id: int, db: Session, file_info: dict = None):
     """处理文件并 yield 进度更新"""
-    import importlib.util
-    
-    # 使用 importlib 明确加载根目录的 main.py（避免与 backend/main.py 冲突）
-    main_path = os.path.join(root_dir, "main.py")
-    spec = importlib.util.spec_from_file_location("paper_main", main_path)
-    paper_main = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(paper_main)
-    
-    extract_pdf_content = paper_main.extract_pdf_content
-    task_extract_metadata = paper_main.task_extract_metadata
-    task_analyze_paper = paper_main.task_analyze_paper
-    normalize_title = paper_main.normalize_title
-    
-    # 获取 llm_manager (已在 paper_main 中初始化)
-    from llm_pool import llm_manager
+    # 获取 llm_manager 并刷新配置
+    from backend.core.llm_pool import llm_manager
     
     # 步骤 1: 保存临时文件用于处理
     yield {"step": 1, "total": 4, "message": "保存文件...", "status": "processing"}

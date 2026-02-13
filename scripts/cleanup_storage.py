@@ -5,8 +5,8 @@ import os
 import argparse
 from datetime import datetime, timedelta
 
-from db_models import Session, Paper
-from file_service import file_service
+from backend.core.db_models import Session, Paper
+from backend.core.file_service import file_service
 
 
 def collect_known_files(session: Session) -> set[str]:

@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import Optional
 
-from db_models import Paper, User, Group
-from file_service import file_service
+from backend.core.db_models import Paper, User, Group
+from backend.core.file_service import file_service
 
 
 class PaperService:
@@ -184,3 +184,4 @@ class PaperService:
 
         self.db.commit()
         return updated_count
+

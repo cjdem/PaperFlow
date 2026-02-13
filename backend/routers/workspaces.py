@@ -9,7 +9,7 @@ from datetime import datetime
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_models import (
+from backend.core.db_models import (
     User, Paper, Workspace, WorkspaceMember, 
     WorkspaceInvitation, WorkspacePaper
 )
@@ -27,7 +27,7 @@ from schemas import (
     SharePaperRequest, WorkspacePaperResponse, WorkspacePaperListResponse,
     PaperResponse, GroupInfo
 )
-from audit_service import log_audit_event
+from backend.core.audit_service import log_audit_event
 
 router = APIRouter(prefix="/api/workspaces", tags=["团队空间"])
 
@@ -652,3 +652,4 @@ async def remove_paper_from_workspace(
     )
     
     return {"message": "论文已从空间移除"}
+

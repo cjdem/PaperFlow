@@ -14,18 +14,18 @@ from sqlalchemy.orm import Session, joinedload
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
-from llm_pool import (
+from backend.core.db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
+from backend.core.llm_pool import (
     llm_manager,
     GeminiClientWrapper,
     AnthropicClientWrapper,
     build_openai_async_client,
 )
-from file_service import file_service
-from llm_format import normalize_request_format, format_to_legacy_api_type
+from backend.core.file_service import file_service
+from backend.core.llm_format import normalize_request_format, format_to_legacy_api_type
 
 from deps import get_db, get_current_admin
-from llm_service import mark_provider_success, mark_provider_failure
+from backend.core.llm_service import mark_provider_success, mark_provider_failure
 from schemas import (
     DbStatsResponse, LLMProviderResponse,
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
@@ -673,3 +673,4 @@ async def get_storage_stats(
             for u in storage_stats.get("users", [])
         ]
     }
+

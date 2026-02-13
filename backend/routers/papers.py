@@ -11,10 +11,10 @@ from urllib.parse import quote
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_models import Paper, User
-from file_service import file_service
-from audit_service import log_audit_event
-from log_service import get_logger
+from backend.core.db_models import Paper, User
+from backend.core.file_service import file_service
+from backend.core.audit_service import log_audit_event
+from backend.core.log_service import get_logger
 # 注意：reanalyze_paper 使用延迟导入以避免循环导入
 
 from deps import get_current_user, get_paper_service, get_db
@@ -311,13 +311,8 @@ async def reanalyze_paper_endpoint(
         raise HTTPException(status_code=404, detail="文件不存在或路径不安全，无法重新分析")
     
     try:
-        # 延迟导入以避免循环导入（从仓库根目录的 main.py 加载）
-        import importlib.util
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        spec = importlib.util.spec_from_file_location("paper_main", os.path.join(root_dir, "main.py"))
-        paper_main = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(paper_main)
-        reanalyze_paper = paper_main.reanalyze_paper
+        # 延迟导入以避免循环导入
+        from backend.services.paper_pipeline import reanalyze_paper
 
         # 执行重新分析（允许管理员分析任何论文）
         owner_id = None if current_user.role == "admin" else current_user.id
@@ -341,3 +336,4 @@ async def reanalyze_paper_endpoint(
     except Exception as e:
         logger.exception("重新分析失败", exc_info=e)
         raise HTTPException(status_code=500, detail=f"重新分析失败: {str(e)}")
+

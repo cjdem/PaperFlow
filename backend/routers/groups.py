@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_models import Group, User
+from backend.core.db_models import Group, User
 
 from deps import get_db, get_current_user
 from schemas import CreateGroupRequest, GroupResponse
@@ -63,3 +63,4 @@ async def delete_group(
     db.commit()
     
     return {"message": "删除成功"}
+

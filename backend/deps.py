@@ -14,11 +14,11 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from settings import settings
+from backend.core.settings import settings
 from backend.services.paper_service import PaperService
 
 # 复用 db_models 中的数据库配置，确保使用同一个数据库
-from db_models import Base, User, Session as DBSession, Workspace, WorkspaceMember
+from backend.core.db_models import Base, User, Session as DBSession, Workspace, WorkspaceMember
 
 # ================= 数据库配置 =================
 # 直接使用 db_models 中的 Session，不创建新的引擎
@@ -186,3 +186,4 @@ def check_workspace_owner(
 ) -> tuple[Workspace, WorkspaceMember]:
     """检查用户是否是空间所有者"""
     return check_workspace_access(workspace_id, user, db, ["owner"])
+

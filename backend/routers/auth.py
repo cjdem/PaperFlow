@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_models import User
+from backend.core.db_models import User
 
 from deps import get_db, create_access_token, get_current_user
 from schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
@@ -71,3 +71,4 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """获取当前用户信息"""
     return UserResponse(id=current_user.id, username=current_user.username, role=current_user.role)
+

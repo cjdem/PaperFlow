@@ -68,9 +68,9 @@ cp .env.example .env
 或者手动创建（`JWT_SECRET_KEY` 为必填）：
 
 ```bash
-DB_URL=sqlite:///papers.db
+DB_URL=sqlite:///data/papers.db
 JWT_SECRET_KEY=change-me-to-a-strong-secret
-FILE_STORAGE_PATH=./uploads
+FILE_STORAGE_PATH=runtime/uploads
 STORAGE_QUOTA_MB=2048
 ```
 
@@ -123,8 +123,7 @@ cp llm_config.json.example llm_config.json
 
 **启动后端 (Port 8000)**
 ```bash
-cd backend
-uvicorn main:app --reload
+uvicorn backend.main:app --reload
 ```
 
 **启动前端 (Port 3000)**
@@ -151,6 +150,7 @@ PaperFlow/
 │   │   ├── export.py      # 批量导出
 │   │   ├── translate.py   # PDF 翻译 API
 │   │   └── admin.py       # 管理员功能 + 存储统计 + 翻译配置
+│   ├── core/              # 后端核心模块（配置/数据库/LLM/翻译）
 │   ├── main.py            # 应用入口
 │   ├── schemas.py         # Pydantic 模型
 │   └── ...
@@ -173,18 +173,30 @@ PaperFlow/
 │   │       ├── AcademicMarkdownRenderer.tsx  # 学术 Markdown 渲染器
 │   │       └── renderers/         # 自定义渲染器（代码、数学公式等）
 │   └── lib/api.ts         # API 客户端
-├── uploads/               # 文件存储目录
-│   └── papers/            # PDF 文件（按用户目录存储）
-│       └── user_{id}/     # 用户文件目录
-├── db_models.py           # 数据库模型 (Shared)
-├── file_service.py        # 文件存储服务
-├── translation_service.py # PDF 翻译服务
-├── translation_queue.py   # 翻译队列管理
-├── llm_pool.py            # LLM 核心逻辑
-├── llm_service.py         # LLM CRUD
+├── runtime/
+│   ├── logs/              # 运行日志目录
+│   └── uploads/           # 文件存储目录
+│       └── papers/        # PDF 文件（按用户目录存储）
+│           └── user_{id}/ # 用户文件目录
+├── data/
+│   └── papers.db          # SQLite 数据库（默认）
+├── db_models.py           # 兼容层（转发到 backend/core）
+├── file_service.py        # 兼容层（转发到 backend/core）
+├── translation_service.py # 兼容层（转发到 backend/core）
+├── translation_queue.py   # 兼容层（转发到 backend/core）
+├── llm_pool.py            # 兼容层（转发到 backend/core）
+├── llm_service.py         # 兼容层（转发到 backend/core）
 ├── llm_config.json.example # 配置文件模版
 └── requirements.txt       # 依赖列表
 ```
+
+## 🧱 架构说明（2026-02）
+
+- **核心实现收敛到 `backend/core`**：配置、数据库、文件服务、LLM 池、翻译队列等统一在 `backend/core` 下维护。
+- **根目录模块保留为兼容层**：`settings.py`、`db_models.py`、`llm_pool.py` 等仍可导入，但仅做转发，避免历史脚本/调用中断。
+- **后端业务统一导入核心模块**：`backend/routers/*`、`backend/services/*` 已改为 `backend.core.*`，降低路径耦合和重复状态风险。
+- **运行时路径统一**：默认使用 `data/papers.db`、`runtime/logs`、`runtime/uploads`，避免因启动目录不同产生多份运行时文件。
+- **论文处理链路模块化**：上传/重分析流程统一收敛到 `backend/services/paper_pipeline.py`，不再通过动态加载根目录 `main.py`。
 
 ## 🔧 管理员功能
 
@@ -272,7 +284,7 @@ PaperFlow/
 
 ### 存储结构
 ```
-uploads/papers/user_{id}/
+runtime/uploads/papers/user_{id}/
 ├── {md5_hash}.pdf           # 原始 PDF
 ├── {md5_hash}.zh.mono.pdf   # 中文翻译版
 └── {md5_hash}.zh.dual.pdf   # 双语对照版
@@ -290,7 +302,7 @@ uploads/papers/user_{id}/
 ### 配置选项
 在 `.env` 文件中可配置：
 ```env
-FILE_STORAGE_PATH=./uploads    # 文件存储根路径
+FILE_STORAGE_PATH=runtime/uploads    # 文件存储根路径
 ```
 
 ## 🌐 PDF 翻译功能
