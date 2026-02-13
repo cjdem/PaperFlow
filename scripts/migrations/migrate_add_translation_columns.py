@@ -2,22 +2,25 @@
 数据库迁移脚本：为 translation_llm_providers 表添加性能优化相关列
 
 运行方式：
-cd paper_workflow
-python migrate_add_translation_columns.py
+python scripts/migrations/migrate_add_translation_columns.py
 """
 
 import sqlite3
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(REPO_ROOT, ".env"))
 
 def get_db_path():
     """获取数据库路径"""
-    db_url = os.getenv("DB_URL", "sqlite:///papers.db")
+    db_url = os.getenv("DB_URL", "sqlite:///data/papers.db")
     if db_url.startswith("sqlite:///"):
-        return db_url.replace("sqlite:///", "")
-    return "papers.db"
+        db_path = db_url.replace("sqlite:///", "")
+        if os.path.isabs(db_path):
+            return db_path
+        return os.path.abspath(os.path.join(REPO_ROOT, db_path))
+    return os.path.abspath(os.path.join(REPO_ROOT, "data/papers.db"))
 
 def migrate():
     """执行迁移"""

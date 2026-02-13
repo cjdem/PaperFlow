@@ -79,7 +79,7 @@ STORAGE_QUOTA_MB=2048
 若从旧版本升级，需在项目根目录执行一次：
 
 ```bash
-python migrate_add_audit_and_provider_health.py
+python scripts/migrations/migrate_add_audit_and_provider_health.py
 ```
 
 ### 5. 配置 LLM 提供商（首次运行可选）
@@ -180,12 +180,8 @@ PaperFlow/
 │           └── user_{id}/ # 用户文件目录
 ├── data/
 │   └── papers.db          # SQLite 数据库（默认）
-├── db_models.py           # 兼容层（转发到 backend/core）
-├── file_service.py        # 兼容层（转发到 backend/core）
-├── translation_service.py # 兼容层（转发到 backend/core）
-├── translation_queue.py   # 兼容层（转发到 backend/core）
-├── llm_pool.py            # 兼容层（转发到 backend/core）
-├── llm_service.py         # 兼容层（转发到 backend/core）
+├── scripts/
+│   └── migrations/        # 数据库迁移脚本
 ├── llm_config.json.example # 配置文件模版
 └── requirements.txt       # 依赖列表
 ```
@@ -193,7 +189,6 @@ PaperFlow/
 ## 🧱 架构说明（2026-02）
 
 - **核心实现收敛到 `backend/core`**：配置、数据库、文件服务、LLM 池、翻译队列等统一在 `backend/core` 下维护。
-- **根目录模块保留为兼容层**：`settings.py`、`db_models.py`、`llm_pool.py` 等仍可导入，但仅做转发，避免历史脚本/调用中断。
 - **后端业务统一导入核心模块**：`backend/routers/*`、`backend/services/*` 已改为 `backend.core.*`，降低路径耦合和重复状态风险。
 - **运行时路径统一**：默认使用 `data/papers.db`、`runtime/logs`、`runtime/uploads`，避免因启动目录不同产生多份运行时文件。
 - **论文处理链路模块化**：上传/重分析流程统一收敛到 `backend/services/paper_pipeline.py`，不再通过动态加载根目录 `main.py`。

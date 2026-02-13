@@ -4,7 +4,7 @@
 """
 from sqlalchemy import inspect, text
 
-from db_models import engine, AuditLog
+from backend.core.db_models import engine, AuditLog
 
 
 def _add_column_if_missing(table: str, column: str, column_type: str):
