@@ -105,6 +105,48 @@ class DbStatsResponse(BaseModel):
     group_count: int
 
 
+class AdminUserDetailResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: Optional[str] = None
+
+
+class AdminResetPasswordResponse(BaseModel):
+    user_id: int
+    username: str
+    temporary_password: str
+    generated: bool = False
+
+
+class AdminPaperDetailResponse(BaseModel):
+    id: int
+    title: Optional[str] = None
+    title_cn: Optional[str] = None
+    authors: Optional[str] = None
+    year: Optional[str] = None
+    journal: Optional[str] = None
+    owner_id: Optional[int] = None
+    owner_username: Optional[str] = None
+
+
+class AdminGroupPaperItem(BaseModel):
+    id: int
+    title: Optional[str] = None
+    owner_id: Optional[int] = None
+    owner_username: Optional[str] = None
+
+
+class AdminGroupDetailResponse(BaseModel):
+    id: int
+    name: str
+    paper_count: int
+    papers: list[AdminGroupPaperItem] = []
+
+
 # ================= Storage Stats =================
 class UserStorageStats(BaseModel):
     """用户存储统计"""

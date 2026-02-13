@@ -3,10 +3,13 @@
 """
 import logging
 import time
+import hashlib
+import secrets
+import string
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 import sys
 import os
@@ -26,7 +29,10 @@ from llm_service import mark_provider_success, mark_provider_failure
 from schemas import (
     DbStatsResponse, LLMProviderResponse,
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
-    SystemConfigRequest, UserResponse, UserQuotaRequest
+    SystemConfigRequest, UserResponse, UserQuotaRequest,
+    AdminUserDetailResponse, AdminPaperDetailResponse,
+    AdminGroupDetailResponse, AdminGroupPaperItem,
+    AdminResetPasswordRequest, AdminResetPasswordResponse
 )
 from openai import APIStatusError
 import httpx
@@ -55,6 +61,15 @@ def trigger_reload_async():
 def _pick_first(value: str) -> str:
     items = [item.strip() for item in (value or "").split(",") if item.strip()]
     return items[0] if items else ""
+
+
+def _make_password_hash(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def _generate_temp_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 async def _test_provider_connectivity(provider: LLMProvider) -> dict:
@@ -185,6 +200,81 @@ async def get_stats(
     )
 
 
+@router.get("/stats/users", response_model=list[AdminUserDetailResponse])
+async def get_stats_users(
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """获取系统统计 - 用户明细"""
+    users = db.query(User).order_by(User.id.asc()).all()
+    return [
+        AdminUserDetailResponse(
+            id=u.id,
+            username=u.username,
+            role=u.role
+        )
+        for u in users
+    ]
+
+
+@router.get("/stats/papers", response_model=list[AdminPaperDetailResponse])
+async def get_stats_papers(
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """获取系统统计 - 论文明细（附带所属用户名）"""
+    papers = (
+        db.query(Paper)
+        .options(joinedload(Paper.owner))
+        .order_by(Paper.id.desc())
+        .all()
+    )
+    return [
+        AdminPaperDetailResponse(
+            id=p.id,
+            title=p.title,
+            title_cn=p.title_cn,
+            authors=p.authors,
+            year=p.year,
+            journal=p.journal,
+            owner_id=p.owner_id,
+            owner_username=p.owner.username if p.owner else None
+        )
+        for p in papers
+    ]
+
+
+@router.get("/stats/groups", response_model=list[AdminGroupDetailResponse])
+async def get_stats_groups(
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """获取系统统计 - 分组明细（附带分组内论文与所属用户）"""
+    groups = (
+        db.query(Group)
+        .options(joinedload(Group.papers).joinedload(Paper.owner))
+        .order_by(Group.name.asc())
+        .all()
+    )
+    return [
+        AdminGroupDetailResponse(
+            id=g.id,
+            name=g.name,
+            paper_count=len(g.papers),
+            papers=[
+                AdminGroupPaperItem(
+                    id=p.id,
+                    title=p.title,
+                    owner_id=p.owner_id,
+                    owner_username=p.owner.username if p.owner else None
+                )
+                for p in g.papers
+            ]
+        )
+        for g in groups
+    ]
+
+
 @router.get("/users", response_model=list[UserResponse])
 async def get_users(
     current_user: User = Depends(get_current_admin),
@@ -209,6 +299,38 @@ async def set_user_quota(
     user.storage_quota_mb = max(0, request.storage_quota_mb)
     db.commit()
     return {"message": "设置成功"}
+
+
+@router.post("/users/{user_id}/reset-password", response_model=AdminResetPasswordResponse)
+async def reset_user_password(
+    user_id: int,
+    request: Optional[AdminResetPasswordRequest] = None,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """管理员重置用户密码，支持手动设置或自动生成临时密码"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    raw_password = (request.new_password.strip() if request and request.new_password else "")
+    generated = False
+    if not raw_password:
+        raw_password = _generate_temp_password()
+        generated = True
+
+    if len(raw_password) < 6:
+        raise HTTPException(status_code=400, detail="密码长度至少 6 位")
+
+    user.password_hash = _make_password_hash(raw_password)
+    db.commit()
+
+    return AdminResetPasswordResponse(
+        user_id=user.id,
+        username=user.username,
+        temporary_password=raw_password,
+        generated=generated
+    )
 
 
 # ================= LLM 配置 =================

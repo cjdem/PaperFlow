@@ -30,6 +30,44 @@ interface StorageStats {
     users: UserStorageStats[];
 }
 
+interface AdminUserDetail {
+    id: number;
+    username: string;
+    role: string;
+}
+
+interface AdminResetPasswordResponse {
+    user_id: number;
+    username: string;
+    temporary_password: string;
+    generated: boolean;
+}
+
+interface AdminPaperDetail {
+    id: number;
+    title: string | null;
+    title_cn: string | null;
+    authors: string | null;
+    year: string | null;
+    journal: string | null;
+    owner_id: number | null;
+    owner_username: string | null;
+}
+
+interface AdminGroupPaperItem {
+    id: number;
+    title: string | null;
+    owner_id: number | null;
+    owner_username: string | null;
+}
+
+interface AdminGroupDetail {
+    id: number;
+    name: string;
+    paper_count: number;
+    papers: AdminGroupPaperItem[];
+}
+
 interface LLMProvider {
     id: number;
     name: string;
@@ -123,6 +161,11 @@ export default function AdminPage() {
     const [retryCount, setRetryCount] = useState('3');
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     const [testingProviderId, setTestingProviderId] = useState<number | null>(null);
+    const [statsDetailType, setStatsDetailType] = useState<'users' | 'papers' | 'groups' | null>(null);
+    const [statsDetailLoading, setStatsDetailLoading] = useState(false);
+    const [userDetails, setUserDetails] = useState<AdminUserDetail[]>([]);
+    const [paperDetails, setPaperDetails] = useState<AdminPaperDetail[]>([]);
+    const [groupDetails, setGroupDetails] = useState<AdminGroupDetail[]>([]);
 
     const loadRetryConfig = useCallback(async () => {
         const data = await apiClient.get<{ key: string; value: string | null }>('/api/admin/config/llm_max_retries');
@@ -164,6 +207,60 @@ export default function AdminPage() {
         enabled: isAuthorized,
         deps: [activeTab, activePoolTab]
     });
+
+    const openStatsDetail = async (type: 'users' | 'papers' | 'groups') => {
+        setStatsDetailType(type);
+        setStatsDetailLoading(true);
+        try {
+            if (type === 'users') {
+                const data = await apiClient.get<AdminUserDetail[]>('/api/admin/stats/users');
+                setUserDetails(data);
+                return;
+            }
+            if (type === 'papers') {
+                const data = await apiClient.get<AdminPaperDetail[]>('/api/admin/stats/papers');
+                setPaperDetails(data);
+                return;
+            }
+            const data = await apiClient.get<AdminGroupDetail[]>('/api/admin/stats/groups');
+            setGroupDetails(data);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : '加载详情失败';
+            alert(msg);
+            setStatsDetailType(null);
+        } finally {
+            setStatsDetailLoading(false);
+        }
+    };
+
+    const closeStatsDetail = () => {
+        setStatsDetailType(null);
+        setStatsDetailLoading(false);
+    };
+
+    const resetUserPassword = async (user: AdminUserDetail) => {
+        const input = prompt(
+            `为用户「${user.username}」设置新密码。\n留空将自动生成临时密码（至少 6 位）。`,
+            ''
+        );
+        if (input === null) return;
+
+        const newPassword = input.trim();
+        if (newPassword && newPassword.length < 6) {
+            alert('密码长度至少 6 位');
+            return;
+        }
+
+        try {
+            const payload = newPassword ? { new_password: newPassword } : {};
+            const res = await apiClient.post<AdminResetPasswordResponse>(`/api/admin/users/${user.id}/reset-password`, payload);
+            const mode = res.generated ? '（系统生成）' : '（手动设置）';
+            alert(`✅ 用户 ${res.username} 密码已重置 ${mode}\n新密码：${res.temporary_password}\n请妥善保存并尽快通知用户修改。`);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : '重置密码失败';
+            alert(`❌ ${msg}`);
+        }
+    };
 
     const handleEdit = (p: LLMProvider) => {
         setEditingProvider(p);
@@ -514,6 +611,138 @@ export default function AdminPage() {
         </div>
     );
 
+    const renderStatsDetailModal = () => {
+        if (!statsDetailType) return null;
+
+        const titleMap: Record<'users' | 'papers' | 'groups', string> = {
+            users: '👥 用户明细',
+            papers: '📄 论文明细',
+            groups: '🏷️ 分组明细'
+        };
+
+        return (
+            <div
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={closeStatsDetail}
+            >
+                <div
+                    className="fluent-card w-full max-w-6xl max-h-[88vh] overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="p-5 border-b border-[var(--fluent-divider)] flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-[var(--fluent-foreground)]">{titleMap[statsDetailType]}</h3>
+                        <button
+                            onClick={closeStatsDetail}
+                            className="fluent-button fluent-button-subtle px-3 py-1.5 text-sm"
+                        >
+                            关闭
+                        </button>
+                    </div>
+
+                    <div className="p-5 overflow-y-auto max-h-[72vh]">
+                        {statsDetailLoading && (
+                            <div className="py-12 text-center text-[var(--fluent-foreground-secondary)]">
+                                加载中...
+                            </div>
+                        )}
+
+                        {!statsDetailLoading && statsDetailType === 'users' && (
+                            <div className="space-y-3">
+                                <p className="text-sm text-[var(--fluent-foreground-secondary)]">
+                                    系统不存储明文密码；如用户忘记密码，请点击“重置密码”生成新密码后告知用户。
+                                </p>
+                                <div className="overflow-x-auto">
+                                    <table className="fluent-table-glass w-full">
+                                        <thead>
+                                            <tr>
+                                                <th className="text-left">ID</th>
+                                                <th className="text-left">用户名</th>
+                                                <th className="text-left">角色</th>
+                                                <th className="text-left">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {userDetails.map((u) => (
+                                                <tr key={u.id}>
+                                                    <td>{u.id}</td>
+                                                    <td className="font-medium text-[var(--fluent-foreground)]">{u.username}</td>
+                                                    <td>{u.role}</td>
+                                                    <td>
+                                                        <button
+                                                            onClick={() => resetUserPassword(u)}
+                                                            className="fluent-button px-3 py-1.5 text-sm bg-orange-500/20 text-orange-300 hover:bg-orange-500/30"
+                                                        >
+                                                            🔐 重置密码
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {!statsDetailLoading && statsDetailType === 'papers' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {paperDetails.map((p) => (
+                                    <div key={p.id} className="fluent-card p-4">
+                                        <h4 className="text-base font-semibold text-[var(--fluent-foreground)] break-words">
+                                            {p.title || `论文 #${p.id}`}
+                                        </h4>
+                                        {p.title_cn && (
+                                            <p className="text-sm text-[var(--fluent-foreground-secondary)] mt-1 break-words">{p.title_cn}</p>
+                                        )}
+                                        <div className="mt-3 text-sm text-[var(--fluent-foreground-secondary)] space-y-1">
+                                            <p>👤 用户：<span className="text-[var(--fluent-foreground)] font-medium">{p.owner_username || '-'}</span></p>
+                                            <p>📚 期刊：{p.journal || '-'}</p>
+                                            <p>📅 年份：{p.year || '-'}</p>
+                                            <p className="break-words">✍️ 作者：{p.authors || '-'}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                                {paperDetails.length === 0 && (
+                                    <div className="col-span-full text-center py-12 text-[var(--fluent-foreground-secondary)]">
+                                        暂无论文数据
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {!statsDetailLoading && statsDetailType === 'groups' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {groupDetails.map((g) => (
+                                    <div key={g.id} className="fluent-card p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h4 className="text-base font-semibold text-[var(--fluent-foreground)] break-words">{g.name}</h4>
+                                            <span className="fluent-badge">{g.paper_count} 篇</span>
+                                        </div>
+                                        <div className="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
+                                            {g.papers.map((p) => (
+                                                <div key={p.id} className="text-sm text-[var(--fluent-foreground-secondary)] break-words">
+                                                    <span className="text-[var(--fluent-foreground)]">{p.title || `论文 #${p.id}`}</span>
+                                                    <span className="ml-2">({p.owner_username || '-'})</span>
+                                                </div>
+                                            ))}
+                                            {g.papers.length === 0 && (
+                                                <div className="text-sm text-[var(--fluent-foreground-secondary)]">该分组暂无论文</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {groupDetails.length === 0 && (
+                                    <div className="col-span-full text-center py-12 text-[var(--fluent-foreground-secondary)]">
+                                        暂无分组数据
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen fluent-background p-6">
             <div className="max-w-6xl mx-auto">
@@ -552,12 +781,16 @@ export default function AdminPage() {
                 {/* Stats Tab */}
                 {activeTab === 'stats' && stats && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="fluent-stat-card-enhanced fluent-stat-card-blue fluent-stagger-item group">
+                        <button
+                            type="button"
+                            onClick={() => openStatsDetail('users')}
+                            className="fluent-stat-card-enhanced fluent-stat-card-blue fluent-stagger-item group text-left cursor-pointer"
+                        >
                             <div className="flex items-start justify-between">
                                 <div>
                                     <div className="text-sm font-medium text-[var(--text-secondary)] mb-2">用户数</div>
                                     <div className="text-4xl font-bold text-[var(--text-primary)] mb-1">{stats.user_count}</div>
-                                    <div className="text-xs text-[var(--text-tertiary)]">注册用户总数</div>
+                                    <div className="text-xs text-[var(--text-tertiary)]">注册用户总数（点击查看详情）</div>
                                 </div>
                                 <div className="fluent-stat-icon">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -568,13 +801,17 @@ export default function AdminPage() {
                                     </svg>
                                 </div>
                             </div>
-                        </div>
-                        <div className="fluent-stat-card-enhanced fluent-stat-card-purple fluent-stagger-item group">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => openStatsDetail('papers')}
+                            className="fluent-stat-card-enhanced fluent-stat-card-purple fluent-stagger-item group text-left cursor-pointer"
+                        >
                             <div className="flex items-start justify-between">
                                 <div>
                                     <div className="text-sm font-medium text-[var(--text-secondary)] mb-2">论文数</div>
                                     <div className="text-4xl font-bold text-[var(--text-primary)] mb-1">{stats.paper_count}</div>
-                                    <div className="text-xs text-[var(--text-tertiary)]">已上传论文总数</div>
+                                    <div className="text-xs text-[var(--text-tertiary)]">已上传论文总数（点击查看详情）</div>
                                 </div>
                                 <div className="fluent-stat-icon fluent-stat-icon-purple">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -586,13 +823,17 @@ export default function AdminPage() {
                                     </svg>
                                 </div>
                             </div>
-                        </div>
-                        <div className="fluent-stat-card-enhanced fluent-stat-card-green fluent-stagger-item group">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => openStatsDetail('groups')}
+                            className="fluent-stat-card-enhanced fluent-stat-card-green fluent-stagger-item group text-left cursor-pointer"
+                        >
                             <div className="flex items-start justify-between">
                                 <div>
                                     <div className="text-sm font-medium text-[var(--text-secondary)] mb-2">分组数</div>
                                     <div className="text-4xl font-bold text-[var(--text-primary)] mb-1">{stats.group_count}</div>
-                                    <div className="text-xs text-[var(--text-tertiary)]">论文分组总数</div>
+                                    <div className="text-xs text-[var(--text-tertiary)]">论文分组总数（点击查看详情）</div>
                                 </div>
                                 <div className="fluent-stat-icon fluent-stat-icon-green">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -600,7 +841,7 @@ export default function AdminPage() {
                                     </svg>
                                 </div>
                             </div>
-                        </div>
+                        </button>
                     </div>
                 )}
 
@@ -850,6 +1091,8 @@ export default function AdminPage() {
                         <TranslationMonitor />
                     </div>
                 )}
+
+                {renderStatsDetailModal()}
             </div>
         </div>
     );
