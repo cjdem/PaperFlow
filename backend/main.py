@@ -1,6 +1,7 @@
 """
 PaperFlow Pro - FastAPI 后端入口
 """
+import asyncio
 import os
 import sys
 import logging
@@ -89,3 +90,15 @@ async def startup_event():
     count = import_from_json()
     if count > 0:
         print(f"从 llm_config.json 导入了 {count} 个 LLM 提供商")
+
+    # 恢复中断的翻译任务并自动启动翻译 worker
+    from translation_queue import translation_queue_manager
+    recovery = translation_queue_manager.recover_incomplete_tasks_on_startup()
+    logger.info(
+        "翻译任务恢复结果: recovered=%s, failed=%s, orphaned_papers=%s",
+        recovery.get("recovered", 0),
+        recovery.get("failed", 0),
+        recovery.get("orphaned_papers", 0),
+    )
+    if not translation_queue_manager.is_running:
+        asyncio.create_task(translation_queue_manager.start_worker())

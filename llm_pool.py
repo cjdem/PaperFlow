@@ -19,6 +19,7 @@ from settings import settings
 from llm_format import normalize_request_format, format_to_legacy_api_type
 
 logger = get_logger("llm_pool")
+OPENAI_USER_AGENT = "PaperFlow/1.0"
 
 
 def build_httpx_client(timeout: httpx.Timeout, proxy: str | None) -> httpx.AsyncClient:
@@ -30,6 +31,27 @@ def build_httpx_client(timeout: httpx.Timeout, proxy: str | None) -> httpx.Async
         elif "proxies" in params:
             kwargs["proxies"] = proxy
     return httpx.AsyncClient(timeout=timeout, **kwargs)
+
+
+def build_openai_async_client(
+    api_key: str,
+    base_url: str | None,
+    timeout: httpx.Timeout,
+    proxy: str | None,
+) -> AsyncOpenAI:
+    """
+    构建 OpenAI Async 客户端（统一注入 User-Agent，兼容部分网关拦截策略）。
+    """
+    kwargs = {
+        "api_key": api_key,
+        "base_url": base_url,
+        "default_headers": {"User-Agent": OPENAI_USER_AGENT},
+    }
+    if proxy:
+        kwargs["http_client"] = build_httpx_client(timeout, proxy)
+    else:
+        kwargs["timeout"] = timeout
+    return AsyncOpenAI(**kwargs)
 
 
 class GeminiClientWrapper:
@@ -293,19 +315,12 @@ class LLMManager:
                     client = AnthropicClientWrapper(api_key=key, base_url=base_url or None, proxy=proxy)
                 else:  # 默认 openai - 添加超时配置
                     timeout = httpx.Timeout(300.0, connect=30.0)
-                    if proxy:
-                        http_client = build_httpx_client(timeout, proxy)
-                        client = AsyncOpenAI(
-                            api_key=key,
-                            base_url=base_url,
-                            http_client=http_client
-                        )
-                    else:
-                        client = AsyncOpenAI(
-                            api_key=key,
-                            base_url=base_url,
-                            timeout=timeout  # 总超时5分钟，连接超时30秒
-                        )
+                    client = build_openai_async_client(
+                        api_key=key,
+                        base_url=base_url,
+                        timeout=timeout,
+                        proxy=proxy,
+                    )
                 
                 for model_index, model in enumerate(models):
                     provider = base_url.split("//")[-1].split("/")[0] if base_url else "googleapis.com"

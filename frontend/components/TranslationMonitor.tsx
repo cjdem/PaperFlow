@@ -176,8 +176,27 @@ export default function TranslationMonitor() {
 
   // 取消任务
   const cancelTask = async (taskId: number) => {
-    await apiClient.delete(`/api/translate/queue/tasks/${taskId}`);
-    fetchTasks();
+    try {
+      await apiClient.delete(`/api/translate/queue/tasks/${taskId}`);
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '取消任务失败';
+      alert(`❌ ${message}`);
+    }
+  };
+
+  // 重试任务
+  const retryTask = async (taskId: number, force = false) => {
+    if (force && !confirm('将重置该处理中任务并重新入队，确认继续？')) {
+      return;
+    }
+    try {
+      await apiClient.post(`/api/translate/queue/tasks/${taskId}/retry${force ? '?force=true' : ''}`);
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '重试任务失败';
+      alert(`❌ ${message}`);
+    }
   };
 
   // 删除提供商
@@ -507,13 +526,29 @@ export default function TranslationMonitor() {
                             取消
                           </button>
                         )}
+                        {(task.status === 'failed' || task.status === 'cancelled') && (
+                          <button
+                            onClick={() => retryTask(task.id)}
+                            className="text-green-400 hover:text-green-300 text-sm font-medium transition"
+                          >
+                            重试
+                          </button>
+                        )}
+                        {task.status === 'processing' && (
+                          <button
+                            onClick={() => retryTask(task.id, true)}
+                            className="text-yellow-400 hover:text-yellow-300 text-sm font-medium transition"
+                          >
+                            强制重试
+                          </button>
+                        )}
                         {task.status === 'failed' && task.error_message && (
-                          <span
+                          <div
                             className="text-red-400 text-xs cursor-help underline decoration-dotted"
                             title={task.error_message}
                           >
                             查看错误
-                          </span>
+                          </div>
                         )}
                       </td>
                     </tr>

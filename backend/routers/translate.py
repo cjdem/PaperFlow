@@ -63,7 +63,18 @@ async def start_translation(
     
     # 检查是否正在翻译
     if paper.translation_status == "processing":
-        raise HTTPException(status_code=400, detail="论文正在翻译中")
+        active_task = db.query(TranslationQueue).filter(
+            TranslationQueue.paper_id == paper_id,
+            TranslationQueue.status.in_(["pending", "processing"])
+        ).first()
+        if active_task:
+            raise HTTPException(status_code=400, detail="论文正在翻译中")
+        # 兜底修正：若无活动任务但状态残留为 processing，允许重新开始
+        paper.translation_status = "failed"
+        if not paper.translation_error:
+            paper.translation_error = "检测到上次翻译中断，请重试"
+        paper.translation_progress = 0
+        db.commit()
     
     # 添加到翻译队列
     from translation_queue import translation_queue_manager
@@ -398,6 +409,28 @@ async def cancel_translation_task(
         return {"message": "任务已取消"}
     else:
         raise HTTPException(status_code=404, detail="任务不存在或无法取消")
+
+
+@router.post("/queue/tasks/{task_id}/retry")
+async def retry_translation_task(
+    task_id: int,
+    force: bool = Query(False, description="是否强制重试 processing 任务"),
+    current_user: User = Depends(get_current_admin)
+):
+    """手动重试翻译任务（管理员）"""
+    from translation_queue import translation_queue_manager
+
+    result = translation_queue_manager.retry_task(task_id=task_id, force=force)
+    if result.get("success"):
+        return {
+            "message": result.get("message", "任务已重新加入队列"),
+            "task_id": result.get("task_id"),
+            "paper_id": result.get("paper_id"),
+        }
+    raise HTTPException(
+        status_code=int(result.get("status_code", 400)),
+        detail=result.get("message", "重试失败"),
+    )
 
 
 # ================= 翻译 LLM 提供商管理 API（管理员）=================

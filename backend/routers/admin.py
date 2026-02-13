@@ -12,7 +12,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
-from llm_pool import llm_manager, GeminiClientWrapper, AnthropicClientWrapper, build_httpx_client
+from llm_pool import (
+    llm_manager,
+    GeminiClientWrapper,
+    AnthropicClientWrapper,
+    build_openai_async_client,
+)
 from file_service import file_service
 from llm_format import normalize_request_format, format_to_legacy_api_type
 
@@ -23,7 +28,7 @@ from schemas import (
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
     SystemConfigRequest, UserResponse, UserQuotaRequest
 )
-from openai import AsyncOpenAI, APIStatusError
+from openai import APIStatusError
 import httpx
 
 router = APIRouter(prefix="/api/admin", tags=["管理"])
@@ -93,19 +98,12 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
             )
         elif request_format == "openai_response":
             timeout = httpx.Timeout(30.0, connect=10.0)
-            if proxy:
-                http_client = build_httpx_client(timeout, proxy)
-                client = AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=base_url,
-                    http_client=http_client
-                )
-            else:
-                client = AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=base_url,
-                    timeout=timeout
-                )
+            client = build_openai_async_client(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=timeout,
+                proxy=proxy,
+            )
             response = await client.responses.create(
                 model=model,
                 input=messages,
@@ -115,19 +113,12 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
             )
         else:
             timeout = httpx.Timeout(30.0, connect=10.0)
-            if proxy:
-                http_client = build_httpx_client(timeout, proxy)
-                client = AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=base_url,
-                    http_client=http_client
-                )
-            else:
-                client = AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=base_url,
-                    timeout=timeout
-                )
+            client = build_openai_async_client(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=timeout,
+                proxy=proxy,
+            )
             kwargs = {
                 "model": model,
                 "messages": messages,

@@ -163,3 +163,7 @@ frontend/.env.*.local
 .ruff_cache/
 .eslintcache
 frontend/.turbo/
+
+# SQLite runtime files
+*.db-wal
+*.db-shm

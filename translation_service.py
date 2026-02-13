@@ -17,6 +17,40 @@ from settings import settings
 from llm_format import normalize_translation_request_format
 
 logger = get_logger("translation_service")
+_pdf2zh_openai_ua_patched = False
+
+
+def _ensure_pdf2zh_openai_user_agent():
+    """
+    兼容部分 OpenAI 兼容网关的 WAF 规则：
+    对 pdf2zh-next 内部 OpenAI SDK 注入自定义 User-Agent。
+    """
+    global _pdf2zh_openai_ua_patched
+    if _pdf2zh_openai_ua_patched:
+        return
+
+    try:
+        from pdf2zh_next.translator.translator_impl import openai as openai_impl  # type: ignore
+    except Exception as e:
+        logger.debug(f"加载 pdf2zh OpenAI 翻译器模块失败，跳过 UA 补丁: {e}")
+        return
+
+    original_openai_cls = openai_impl.openai.OpenAI
+    if getattr(original_openai_cls, "_paperflow_ua_patched", False):
+        _pdf2zh_openai_ua_patched = True
+        return
+
+    class OpenAIWithPaperFlowUA(original_openai_cls):
+        def __init__(self, *args, **kwargs):
+            headers = dict(kwargs.get("default_headers") or {})
+            headers.setdefault("User-Agent", "PaperFlow/1.0")
+            kwargs["default_headers"] = headers
+            super().__init__(*args, **kwargs)
+
+    OpenAIWithPaperFlowUA._paperflow_ua_patched = True  # type: ignore[attr-defined]
+    openai_impl.openai.OpenAI = OpenAIWithPaperFlowUA
+    _pdf2zh_openai_ua_patched = True
+    logger.info("已应用 pdf2zh OpenAI User-Agent 兼容补丁")
 
 
 class TranslationService:
@@ -191,6 +225,26 @@ class TranslationService:
         
         return settings
 
+    async def _translate_stream_main_process(
+        self,
+        settings_model: "SettingsModel",
+        pdf_path: str,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        在主进程直接执行 babeldoc 翻译，避免子进程中的网关策略拦截。
+        同时显式关闭 debug，避免在输出 PDF 中写入调试框。
+        """
+        from pathlib import Path as _Path
+        from pdf2zh_next.high_level import create_babeldoc_config
+        from babeldoc.format.pdf.high_level import async_translate as babeldoc_translate
+
+        config = create_babeldoc_config(settings_model, _Path(pdf_path))
+        config.debug = False
+        config.show_char_box = False
+
+        async for event in babeldoc_translate(translation_config=config):
+            yield event
+
     @contextlib.contextmanager
     def _temporary_proxy_env(self, proxy: Optional[str]):
         """
@@ -261,6 +315,7 @@ class TranslationService:
         )
 
         def _run_test() -> str:
+            _ensure_pdf2zh_openai_user_agent()
             settings_model = self._build_settings(provider, output_dir)
             from pdf2zh_next.translator import get_translator
             with self._temporary_proxy_env(getattr(provider, "proxy", None)):
@@ -436,14 +491,12 @@ class TranslationService:
             # 构建配置
             output_dir = str(Path(pdf_path).parent)
             settings = self._build_settings(provider, output_dir)
-            
-            # 调用 pdf2zh-next 进行翻译
-            from pdf2zh_next.high_level import do_translate_async_stream
+            _ensure_pdf2zh_openai_user_agent()
             
             output_paths = self.get_output_paths(pdf_path)
             
-            # 注意：do_translate_async_stream 的参数顺序是 (settings, file)
-            async for event in do_translate_async_stream(settings, pdf_path):
+            # 直接在主进程执行翻译：避免子进程网关拦截，同时保持输出为非调试版
+            async for event in self._translate_stream_main_process(settings, pdf_path):
                 event_type = event.get("type", "")
                 
                 if event_type == "stage_summary":
