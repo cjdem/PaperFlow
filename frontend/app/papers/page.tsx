@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     logout, getGroups, createGroup, deletePaper,
     uploadPapersWithProgress, Paper, Group, updatePaperGroups, UploadProgress,
@@ -16,10 +16,12 @@ import { usePolling } from '@/lib/usePolling';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import AdvancedSearch, { SearchParams } from '@/components/AdvancedSearch';
 import TranslationPanel from '@/components/TranslationPanel';
+import AppSidebar from '@/components/AppSidebar';
 
 
 export default function PapersPage() {
     const router = useRouter();
+    const urlSearchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth({ redirectTo: '/' });
     const initialLoadRef = useRef(false);
     const [loading, setLoading] = useState(true);
@@ -51,31 +53,11 @@ export default function PapersPage() {
     const [batchSelectedGroups, setBatchSelectedGroups] = useState<Set<string>>(new Set());
     const [batchLoading, setBatchLoading] = useState(false);
     const [reanalyzingPaperId, setReanalyzingPaperId] = useState<number | null>(null);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const sidebarStorageKey = 'paperflow.sidebar.collapsed';
 
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem(sidebarStorageKey);
-            if (saved !== null) {
-                setSidebarCollapsed(saved === '1');
-            }
-        } catch {
-            // ignore localStorage read errors
-        }
-    }, []);
-
-    const handleToggleSidebar = () => {
-        setSidebarCollapsed(prev => {
-            const next = !prev;
-            try {
-                localStorage.setItem(sidebarStorageKey, next ? '1' : '0');
-            } catch {
-                // ignore localStorage write errors
-            }
-            return next;
-        });
-    };
+        const viewFromUrl = urlSearchParams.get('view') || 'all';
+        setCurrentView(prev => (prev === viewFromUrl ? prev : viewFromUrl));
+    }, [urlSearchParams]);
 
     const loadFilterOptions = useCallback(async () => {
         if (filterOptions) return;
@@ -252,6 +234,12 @@ export default function PapersPage() {
         }
     };
 
+    const handleSidebarViewSelect = useCallback((view: string) => {
+        setCurrentView(view);
+        const nextPath = view === 'all' ? '/papers' : `/papers?view=${encodeURIComponent(view)}`;
+        router.replace(nextPath);
+    }, [router]);
+
     const handleGroupToggle = async (paperId: number, groupName: string, currentGroups: Group[]) => {
         const currentNames = currentGroups.map(g => g.name);
         const newGroups = currentNames.includes(groupName)
@@ -385,228 +373,135 @@ export default function PapersPage() {
 
     return (
         <div className="min-h-screen fluent-background flex">
-            {/* Fluent 侧边栏 */}
-            <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} fluent-sidebar flex flex-col h-screen sticky top-0 transition-all duration-300 overflow-hidden`}>
-                <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} border-b border-[var(--fluent-border)]`}>
-                    {sidebarCollapsed ? (
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                <span className="text-xl">🧬</span>
-                            </div>
+            <AppSidebar
+                user={user}
+                activeSection="papers"
+                currentView={currentView}
+                groups={groups}
+                onSelectView={handleSidebarViewSelect}
+                onLogout={handleLogout}
+                navExtraContent={(collapsed) => (
+                    !collapsed ? (
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newGroupName}
+                                onChange={(e) => setNewGroupName(e.target.value)}
+                                placeholder="新分组名"
+                                className="fluent-input flex-1 text-sm py-2"
+                            />
                             <button
-                                onClick={handleToggleSidebar}
-                                className="fluent-button fluent-button-subtle p-1.5"
-                                title="展开侧边栏"
+                                onClick={handleCreateGroup}
+                                className="fluent-button fluent-button-accent px-3 py-2 text-sm"
                             >
-                                <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
+                                +
                             </button>
                         </div>
-                    ) : (
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0">
-                                    <span className="text-xl">🧬</span>
-                                </div>
-                                <div className="min-w-0">
-                                    <h1 className="text-lg font-bold text-[var(--fluent-foreground)]">PaperFlow</h1>
-                                    <p className="text-xs text-[var(--fluent-foreground-secondary)] truncate">👤 {user?.username}</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleToggleSidebar}
-                                className="fluent-button fluent-button-subtle p-2 flex-shrink-0"
-                                title="收起侧边栏"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-                        </div>
-                    )}
-                    {user?.role === 'admin' && !sidebarCollapsed && (
-                        <button
-                            onClick={() => router.push('/admin')}
-                            className="mt-3 w-full px-3 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 text-xs rounded-lg hover:from-purple-500/30 hover:to-blue-500/30 transition-all border border-purple-500/20 font-medium"
+                    ) : null
+                )}
+                extraContent={(collapsed) => (
+                    <>
+                        <label
+                            className={`fluent-button w-full justify-center cursor-pointer ${collapsed ? 'px-2 py-2' : 'py-3'} ${uploading ? 'bg-gray-600 cursor-wait' : 'fluent-button-accent'}`}
+                            aria-busy={uploading}
+                            title="上传 PDF"
                         >
-                            ⚙️ 管理员控制台
-                        </button>
-                    )}
-                </div>
+                            {uploading ? (
+                                <span className="flex items-center gap-2" role="status" aria-live="polite">
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    {!collapsed && '处理中...'}
+                                </span>
+                            ) : (
+                                <span>{collapsed ? '📤' : '📤 上传 PDF'}</span>
+                            )}
+                            <input type="file" accept=".pdf" multiple onChange={handleUpload} className="hidden" disabled={uploading} />
+                        </label>
 
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <button
-                        onClick={() => setCurrentView('all')}
-                        className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''} ${currentView === 'all' ? 'active' : ''}`}
-                        title="所有论文"
-                    >
-                        <span className="text-lg">📚</span>
-                        {!sidebarCollapsed && <span>所有论文</span>}
-                    </button>
-                    <button
-                        onClick={() => setCurrentView('ungrouped')}
-                        className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''} ${currentView === 'ungrouped' ? 'active' : ''}`}
-                        title="未分类"
-                    >
-                        <span className="text-lg">📂</span>
-                        {!sidebarCollapsed && <span>未分类</span>}
-                    </button>
-                    <button
-                        onClick={() => router.push('/workspaces')}
-                        className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
-                        title="团队空间"
-                    >
-                        <span className="text-lg">👥</span>
-                        {!sidebarCollapsed && <span>团队空间</span>}
-                    </button>
+                        {!collapsed && uploadProgress && (
+                            <div className="mt-3 p-4 fluent-card space-y-3">
+                                {uploadProgress.totalFiles && uploadProgress.totalFiles > 1 && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-medium text-purple-300">📁 总进度</span>
+                                            <span className="text-xs font-bold text-purple-300">
+                                                {(uploadProgress.fileIndex ?? 0) + 1} / {uploadProgress.totalFiles} 个文件
+                                            </span>
+                                        </div>
+                                        <div className="fluent-progress h-2">
+                                            <div
+                                                className="fluent-progress-bar"
+                                                style={{ width: `${(((uploadProgress.fileIndex ?? 0) + (uploadProgress.status === 'success' ? 1 : 0.5)) / uploadProgress.totalFiles) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
-                    <div className="pt-4 mt-4 border-t border-[var(--fluent-divider)]">
-                        {!sidebarCollapsed && (
-                            <p className="text-xs text-[var(--fluent-foreground-secondary)] mb-3 px-2 font-semibold uppercase tracking-wider">分组</p>
-                        )}
-                        {groups.map(g => (
-                            <button
-                                key={g.id}
-                                onClick={() => setCurrentView(g.name)}
-                                className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''} ${currentView === g.name ? 'active' : ''}`}
-                                title={g.name}
-                            >
-                                <span className="text-lg">🏷️</span>
-                                {!sidebarCollapsed && <span>{g.name}</span>}
-                            </button>
-                        ))}
-                    </div>
-
-                    {!sidebarCollapsed && (
-                        <div className="pt-4 mt-2">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newGroupName}
-                                    onChange={(e) => setNewGroupName(e.target.value)}
-                                    placeholder="新分组名"
-                                    className="fluent-input flex-1 text-sm py-2"
-                                />
-                                <button
-                                    onClick={handleCreateGroup}
-                                    className="fluent-button fluent-button-accent px-3 py-2 text-sm"
-                                >
-                                    +
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </nav>
-
-                <div className="p-4 border-t border-[var(--fluent-border)]">
-                    <label
-                        className={`fluent-button w-full justify-center cursor-pointer ${sidebarCollapsed ? 'px-2 py-2' : 'py-3'} ${uploading ? 'bg-gray-600 cursor-wait' : 'fluent-button-accent'}`}
-                        aria-busy={uploading}
-                        title="上传 PDF"
-                    >
-                        {uploading ? (
-                            <span className="flex items-center gap-2" role="status" aria-live="polite">
-                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                {!sidebarCollapsed && '处理中...'}
-                            </span>
-                        ) : (
-                            <span>{sidebarCollapsed ? '📤' : '📤 上传 PDF'}</span>
-                        )}
-                        <input type="file" accept=".pdf" multiple onChange={handleUpload} className="hidden" disabled={uploading} />
-                    </label>
-
-                    {!sidebarCollapsed && uploadProgress && (
-                        <div className="mt-3 p-4 fluent-card space-y-3">
-                            {uploadProgress.totalFiles && uploadProgress.totalFiles > 1 && (
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-medium text-purple-300">📁 总进度</span>
-                                        <span className="text-xs font-bold text-purple-300">
-                                            {(uploadProgress.fileIndex ?? 0) + 1} / {uploadProgress.totalFiles} 个文件
+                                        <span className="text-xs text-[var(--fluent-foreground-secondary)] truncate max-w-[150px]" title={uploadProgress.filename}>
+                                            📄 {uploadProgress.filename}
+                                        </span>
+                                        <span className={`fluent-badge text-xs ${
+                                            uploadProgress.status === 'success' ? 'fluent-badge-success' :
+                                            uploadProgress.status === 'error' ? 'fluent-badge-error' :
+                                            'fluent-badge-primary'
+                                        }`}>
+                                            步骤 {uploadProgress.step}/{uploadProgress.total}
                                         </span>
                                     </div>
-                                    <div className="fluent-progress h-2">
+                                    <div className="fluent-progress h-1.5 mb-2">
                                         <div
-                                            className="fluent-progress-bar"
-                                            style={{ width: `${(((uploadProgress.fileIndex ?? 0) + (uploadProgress.status === 'success' ? 1 : 0.5)) / uploadProgress.totalFiles) * 100}%` }}
+                                            className={`h-full rounded-full transition-all ${
+                                                uploadProgress.status === 'success' ? 'bg-green-500' :
+                                                uploadProgress.status === 'error' ? 'bg-red-500' :
+                                                'fluent-progress-bar'
+                                            }`}
+                                            style={{ width: `${(uploadProgress.step / uploadProgress.total) * 100}%` }}
                                         />
                                     </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs text-[var(--fluent-foreground-secondary)] truncate max-w-[150px]" title={uploadProgress.filename}>
-                                        📄 {uploadProgress.filename}
-                                    </span>
-                                    <span className={`fluent-badge text-xs ${
-                                        uploadProgress.status === 'success' ? 'fluent-badge-success' :
-                                        uploadProgress.status === 'error' ? 'fluent-badge-error' :
-                                        'fluent-badge-primary'
-                                    }`}>
-                                        步骤 {uploadProgress.step}/{uploadProgress.total}
-                                    </span>
-                                </div>
-                                <div className="fluent-progress h-1.5 mb-2">
-                                    <div
-                                        className={`h-full rounded-full transition-all ${
-                                            uploadProgress.status === 'success' ? 'bg-green-500' :
-                                            uploadProgress.status === 'error' ? 'bg-red-500' :
-                                            'fluent-progress-bar'
-                                        }`}
-                                        style={{ width: `${(uploadProgress.step / uploadProgress.total) * 100}%` }}
-                                    />
-                                </div>
-                                <p className={`text-sm ${
-                                    uploadProgress.status === 'success' ? 'text-green-400' :
-                                    uploadProgress.status === 'error' ? 'text-red-400' :
-                                    'text-[var(--fluent-foreground-secondary)]'
-                                }`}>
-                                    {uploadProgress.message}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {!sidebarCollapsed && uploadLogs.length > 0 && (
-                        <div className="mt-3 fluent-card max-h-48 overflow-hidden">
-                            <div className="p-3 flex justify-between items-center border-b border-[var(--fluent-divider)] sticky top-0 bg-inherit">
-                                <span className="text-xs text-[var(--fluent-foreground-secondary)] font-medium">📋 处理日志</span>
-                                <button
-                                    onClick={() => setUploadLogs([])}
-                                    className="text-xs text-[var(--fluent-foreground-secondary)] hover:text-[var(--fluent-foreground)] transition"
-                                >
-                                    清除
-                                </button>
-                            </div>
-                            <div className="p-3 space-y-1 max-h-32 overflow-y-auto">
-                                {uploadLogs.map((log, i) => (
-                                    <div key={i} className={`text-xs font-mono ${
-                                        log.status === 'success' ? 'text-green-400' :
-                                        log.status === 'error' ? 'text-red-400' :
+                                    <p className={`text-sm ${
+                                        uploadProgress.status === 'success' ? 'text-green-400' :
+                                        uploadProgress.status === 'error' ? 'text-red-400' :
                                         'text-[var(--fluent-foreground-secondary)]'
                                     }`}>
-                                        <span className="opacity-50">[{log.time}]</span>{' '}
-                                        <span className="text-purple-400">{log.filename}</span>{' '}
-                                        {log.message}
-                                    </div>
-                                ))}
+                                        {uploadProgress.message}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
 
-                <div className="p-4 border-t border-[var(--fluent-border)]">
-                    <button onClick={handleLogout} className={`fluent-nav-item w-full justify-center ${sidebarCollapsed ? 'px-2' : ''}`} title="退出登录">
-                        <span>🚪</span>
-                        {!sidebarCollapsed && <span>退出登录</span>}
-                    </button>
-                </div>
-            </aside>
+                        {!collapsed && uploadLogs.length > 0 && (
+                            <div className="mt-3 fluent-card max-h-48 overflow-hidden">
+                                <div className="p-3 flex justify-between items-center border-b border-[var(--fluent-divider)] sticky top-0 bg-inherit">
+                                    <span className="text-xs text-[var(--fluent-foreground-secondary)] font-medium">📋 处理日志</span>
+                                    <button
+                                        onClick={() => setUploadLogs([])}
+                                        className="text-xs text-[var(--fluent-foreground-secondary)] hover:text-[var(--fluent-foreground)] transition"
+                                    >
+                                        清除
+                                    </button>
+                                </div>
+                                <div className="p-3 space-y-1 max-h-32 overflow-y-auto">
+                                    {uploadLogs.map((log, i) => (
+                                        <div key={i} className={`text-xs font-mono ${
+                                            log.status === 'success' ? 'text-green-400' :
+                                            log.status === 'error' ? 'text-red-400' :
+                                            'text-[var(--fluent-foreground-secondary)]'
+                                        }`}>
+                                            <span className="opacity-50">[{log.time}]</span>{' '}
+                                            <span className="text-purple-400">{log.filename}</span>{' '}
+                                            {log.message}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            />
 
             {/* 主内容 */}
             <main className="flex-1 p-6 overflow-auto">

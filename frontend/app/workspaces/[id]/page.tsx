@@ -1,10 +1,11 @@
 
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
     logout, Paper, getPapers,
+    getGroups, Group,
     getWorkspace, WorkspaceDetail, WorkspacePaper,
     getWorkspacePapers, sharePapersToWorkspace, removePaperFromWorkspace,
     inviteUser, updateMemberRole, removeMember, leaveWorkspace,
@@ -13,6 +14,7 @@ import {
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { useAuth } from '@/lib/useAuth';
 import { usePolling } from '@/lib/usePolling';
+import AppSidebar from '@/components/AppSidebar';
 
 type TabType = 'papers' | 'members';
 
@@ -24,6 +26,7 @@ export default function WorkspaceDetailPage() {
     const { user, loading: authLoading } = useAuth({ redirectTo: '/' });
     const initialLoadRef = useRef(false);
     const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
+    const [groups, setGroups] = useState<Group[]>([]);
     const [workspacePapers, setWorkspacePapers] = useState<WorkspacePaper[]>([]);
     const [myPapers, setMyPapers] = useState<Paper[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,41 +44,18 @@ export default function WorkspaceDetailPage() {
     const [editName, setEditName] = useState('');
     const [editDesc, setEditDesc] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const sidebarStorageKey = 'paperflow.sidebar.collapsed';
-
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem(sidebarStorageKey);
-            if (saved !== null) {
-                setSidebarCollapsed(saved === '1');
-            }
-        } catch {
-            // ignore localStorage read errors
-        }
-    }, []);
-
-    const handleToggleSidebar = () => {
-        setSidebarCollapsed(prev => {
-            const next = !prev;
-            try {
-                localStorage.setItem(sidebarStorageKey, next ? '1' : '0');
-            } catch {
-                // ignore localStorage write errors
-            }
-            return next;
-        });
-    };
 
     // 加载数据
     const loadData = useCallback(async () => {
         try {
-            const [workspaceData, papersData] = await Promise.all([
+            const [workspaceData, papersData, groupsData] = await Promise.all([
                 getWorkspace(workspaceId),
-                getWorkspacePapers(workspaceId, searchQuery || undefined)
+                getWorkspacePapers(workspaceId, searchQuery || undefined),
+                getGroups()
             ]);
             setWorkspace(workspaceData);
             setWorkspacePapers(papersData.papers);
+            setGroups(groupsData);
         } catch (err) {
             console.error('加载数据失败:', err);
             router.push('/workspaces');
@@ -244,11 +224,11 @@ export default function WorkspaceDetailPage() {
     const getRoleBadge = (role: string) => {
         switch (role) {
             case 'owner':
-                return <span className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">所有者</span>;
+                return <span className="fluent-badge-accent px-2 py-0.5 text-xs rounded-full">所有者</span>;
             case 'admin':
-                return <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">管理员</span>;
+                return <span className="fluent-badge-primary px-2 py-0.5 text-xs rounded-full">管理员</span>;
             default:
-                return <span className="px-2 py-0.5 bg-gray-600 text-white text-xs rounded-full">成员</span>;
+                return <span className="fluent-badge px-2 py-0.5 text-xs rounded-full">成员</span>;
         }
     };
 
@@ -257,84 +237,35 @@ export default function WorkspaceDetailPage() {
 
     if (authLoading || loading) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-                <div className="text-white text-xl">加载中...</div>
+            <div className="min-h-screen fluent-background flex items-center justify-center">
+                <div className="text-[var(--fluent-foreground)] text-xl">加载中...</div>
             </div>
         );
     }
 
     if (!workspace) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-                <div className="text-white text-xl">空间不存在</div>
+            <div className="min-h-screen fluent-background flex items-center justify-center">
+                <div className="text-[var(--fluent-foreground)] text-xl">空间不存在</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-slate-900 flex">
-            {/* 侧边栏 */}
-            <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} bg-slate-800 border-r border-slate-700 flex flex-col h-screen sticky top-0 transition-all duration-300 overflow-hidden`}>
-                <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} border-b border-slate-700`}>
-                    {sidebarCollapsed ? (
-                        <div className="flex flex-col items-center gap-2">
-                            <h1 className="text-xl font-bold text-white">🧬</h1>
-                            <button
-                                onClick={handleToggleSidebar}
-                                className="px-2 py-1 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition"
-                                title="展开侧边栏"
-                            >
-                                <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                    <h1 className="text-xl font-bold text-white">🧬</h1>
-                                    <p className="text-sm text-gray-400 mt-1 truncate">👤 {user?.username}</p>
-                                </div>
-                                <button
-                                    onClick={handleToggleSidebar}
-                                    className="px-2 py-1 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition"
-                                    title="收起侧边栏"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <h1 className="text-xl font-bold text-white mt-2">PaperFlow</h1>
-                        </>
-                    )}
-                </div>
-
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    <button
-                        onClick={() => router.push('/papers')}
-                        className={`w-full px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700 flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2 text-left'}`}
-                        title="我的论文"
-                    >
-                        <span className="text-lg">📚</span>
-                        {!sidebarCollapsed && <span>我的论文</span>}
-                    </button>
-                    <button
-                        onClick={() => router.push('/workspaces')}
-                        className={`w-full px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700 flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2 text-left'}`}
-                        title="团队空间"
-                    >
-                        <span className="text-lg">👥</span>
-                        {!sidebarCollapsed && <span>团队空间</span>}
-                    </button>
-                    <div className="pt-2 border-t border-slate-700">
-                        {!sidebarCollapsed ? (
+        <div className="min-h-screen fluent-background flex">
+            <AppSidebar
+                user={user}
+                activeSection="workspaces"
+                groups={groups}
+                onLogout={handleLogout}
+                navExtraContent={(collapsed) => (
+                    <div className="pt-2 border-t border-[var(--fluent-divider)]">
+                        {!collapsed ? (
                             <>
-                                <p className="text-xs text-gray-500 mb-2 px-3">当前空间</p>
+                                <p className="text-xs text-[var(--fluent-foreground-secondary)] mb-2 px-3">当前空间</p>
                                 <div className="px-3 py-2 bg-purple-600/20 border border-purple-500/50 rounded-lg">
                                     <p className="text-purple-300 font-medium truncate">🏢 {workspace.name}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{getRoleBadge(workspace.my_role)}</p>
+                                    <div className="mt-1">{getRoleBadge(workspace.my_role)}</div>
                                 </div>
                             </>
                         ) : (
@@ -345,33 +276,22 @@ export default function WorkspaceDetailPage() {
                             </div>
                         )}
                     </div>
-                </nav>
-
-                <div className="p-4 border-t border-slate-700">
-                    <button
-                        onClick={handleLogout}
-                        className={`w-full py-2 text-gray-400 hover:text-white transition flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-2'}`}
-                        title="退出登录"
-                    >
-                        <span>🚪</span>
-                        {!sidebarCollapsed && <span>退出登录</span>}
-                    </button>
-                </div>
-            </aside>
+                )}
+            />
 
             {/* 主内容 */}
             <main className="flex-1 p-6 overflow-auto">
                 {/* 标题栏 */}
                 <div className="flex justify-between items-start mb-6">
                     <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <h2 className="text-2xl font-bold text-[var(--fluent-foreground)] flex items-center gap-2">
                             🏢 {workspace.name}
                             {getRoleBadge(workspace.my_role)}
                         </h2>
                         {workspace.description && (
-                            <p className="text-gray-400 mt-1">{workspace.description}</p>
+                            <p className="text-[var(--fluent-foreground-secondary)] mt-1">{workspace.description}</p>
                         )}
-                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-4 mt-2 text-sm text-[var(--fluent-foreground-secondary)]">
                             <span>👤 {workspace.member_count} 成员</span>
                             <span>📄 {workspace.paper_count} 论文</span>
                             <span>创建者: {workspace.owner_username}</span>
@@ -381,7 +301,7 @@ export default function WorkspaceDetailPage() {
                         {isAdmin && (
                             <button
                                 onClick={openEditModal}
-                                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition"
+                                className="fluent-button fluent-button-subtle px-4 py-2"
                             >
                                 ⚙️ 设置
                             </button>
@@ -389,7 +309,7 @@ export default function WorkspaceDetailPage() {
                         {!isOwner && (
                             <button
                                 onClick={handleLeaveWorkspace}
-                                className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition"
+                                className="fluent-button px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30"
                             >
                                 🚪 离开
                             </button>
@@ -398,22 +318,16 @@ export default function WorkspaceDetailPage() {
                 </div>
 
                 {/* 标签页 */}
-                <div className="flex border-b border-slate-700 mb-6">
+                <div className="fluent-tabs mb-6">
                     <button
                         onClick={() => setActiveTab('papers')}
-                        className={`px-6 py-3 font-medium transition-all ${activeTab === 'papers'
-                            ? 'text-purple-400 border-b-2 border-purple-400'
-                            : 'text-gray-400 hover:text-gray-200'
-                            }`}
+                        className={`fluent-tab ${activeTab === 'papers' ? 'active' : ''}`}
                     >
                         📚 论文 ({workspacePapers.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('members')}
-                        className={`px-6 py-3 font-medium transition-all ${activeTab === 'members'
-                            ? 'text-purple-400 border-b-2 border-purple-400'
-                            : 'text-gray-400 hover:text-gray-200'
-                            }`}
+                        className={`fluent-tab ${activeTab === 'members' ? 'active' : ''}`}
                     >
                         👥 成员 ({workspace.members.length})
                     </button>
@@ -428,53 +342,53 @@ export default function WorkspaceDetailPage() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="🔍 搜索论文..."
-                                className="flex-1 max-w-md px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500"
+                                className="fluent-input flex-1 max-w-md"
                             />
                             <button
                                 onClick={openShareModal}
-                                className="px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition"
+                                className="fluent-button fluent-button-accent px-4 py-3"
                             >
                                 ➕ 分享论文
                             </button>
                         </div>
 
                         {workspacePapers.length === 0 ? (
-                            <div className="text-center text-gray-500 py-20">
+                            <div className="text-center text-[var(--fluent-foreground-secondary)] py-20">
                                 <div className="text-6xl mb-4">📄</div>
-                                <p className="text-xl mb-2">暂无论文</p>
+                                <p className="text-xl mb-2 text-[var(--fluent-foreground)]">暂无论文</p>
                                 <p className="text-sm">点击&quot;分享论文&quot;将你的论文分享到此空间</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 {workspacePapers.map(wp => (
-                                    <div key={wp.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                                    <div key={wp.id} className="fluent-card overflow-hidden">
                                         <div className="p-4">
                                             <div className="flex justify-between items-start">
                                                 <div className="flex-1">
-                                                    <h3 className="text-lg font-semibold text-white">{wp.paper.title}</h3>
+                                                    <h3 className="text-lg font-semibold text-[var(--fluent-foreground)]">{wp.paper.title}</h3>
                                                     {wp.paper.title_cn && (
-                                                        <p className="text-gray-400 text-sm mt-1">{wp.paper.title_cn}</p>
+                                                        <p className="text-[var(--fluent-foreground-secondary)] text-sm mt-1">{wp.paper.title_cn}</p>
                                                     )}
-                                                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                                                        <span className="px-2 py-1 bg-slate-700 rounded">{wp.paper.journal || 'Journal'}</span>
+                                                    <div className="flex items-center gap-4 mt-2 text-sm text-[var(--fluent-foreground-secondary)]">
+                                                        <span className="fluent-badge px-2 py-1">{wp.paper.journal || 'Journal'}</span>
                                                         <span>📅 {wp.paper.year}</span>
                                                         <span>✍️ {wp.paper.authors?.slice(0, 50)}...</span>
                                                     </div>
-                                                    <div className="mt-2 text-xs text-gray-600">
+                                                    <div className="mt-2 text-xs text-[var(--fluent-foreground-secondary)]">
                                                         分享者: {wp.shared_by_username} | {new Date(wp.shared_at).toLocaleDateString()}
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2 ml-4">
                                                     <button
                                                         onClick={() => setExpandedPaper(expandedPaper === wp.paper.id ? null : wp.paper.id)}
-                                                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                                                        className="fluent-button fluent-button-subtle px-3 py-1 text-sm"
                                                     >
                                                         {expandedPaper === wp.paper.id ? '收起' : '📖 阅读'}
                                                     </button>
                                                     {(isAdmin || wp.shared_by_id === user?.id) && (
                                                         <button
                                                             onClick={() => handleRemovePaper(wp.paper.id)}
-                                                            className="px-3 py-1 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30"
+                                                            className="fluent-button px-3 py-1 bg-red-600/20 text-red-400 border border-red-500/30 text-sm hover:bg-red-600/30"
                                                         >
                                                             🗑️
                                                         </button>
@@ -484,31 +398,33 @@ export default function WorkspaceDetailPage() {
                                         </div>
 
                                         {expandedPaper === wp.paper.id && (
-                                            <div className="border-t border-slate-700 bg-slate-900">
-                                                <div className="flex border-b border-slate-700">
+                                            <div className="border-t border-[var(--fluent-divider)]">
+                                                <div className="p-4 border-b border-[var(--fluent-divider)]">
+                                                    <div className="fluent-tabs">
                                                     <button
                                                         onClick={() => setDetailTab('analysis')}
-                                                        className={`px-6 py-3 font-medium transition-all ${detailTab === 'analysis' ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-800' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800'}`}
+                                                        className={`fluent-tab ${detailTab === 'analysis' ? 'active' : ''}`}
                                                     >
                                                         💡 深度分析
                                                     </button>
                                                     <button
                                                         onClick={() => setDetailTab('abstract_cn')}
-                                                        className={`px-6 py-3 font-medium transition-all ${detailTab === 'abstract_cn' ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-800' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800'}`}
+                                                        className={`fluent-tab ${detailTab === 'abstract_cn' ? 'active' : ''}`}
                                                     >
                                                         🇨🇳 中文摘要
                                                     </button>
                                                     <button
                                                         onClick={() => setDetailTab('abstract_en')}
-                                                        className={`px-6 py-3 font-medium transition-all ${detailTab === 'abstract_en' ? 'text-green-400 border-b-2 border-green-400 bg-slate-800' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800'}`}
+                                                        className={`fluent-tab ${detailTab === 'abstract_en' ? 'active' : ''}`}
                                                     >
                                                         🇬🇧 英文摘要
                                                     </button>
                                                 </div>
+                                                </div>
                                                 <div className="p-6">
                                                     {detailTab === 'analysis' && <MarkdownRenderer content={wp.paper.detailed_analysis || '暂无分析内容'} />}
-                                                    {detailTab === 'abstract_cn' && <div className="text-gray-200 text-lg leading-9">{wp.paper.abstract || '暂无中文摘要'}</div>}
-                                                    {detailTab === 'abstract_en' && <div className="text-gray-200 text-lg leading-9 font-serif italic">{wp.paper.abstract_en || 'No English abstract available'}</div>}
+                                                    {detailTab === 'abstract_cn' && <div className="text-[var(--fluent-foreground)] text-lg leading-9">{wp.paper.abstract || '暂无中文摘要'}</div>}
+                                                    {detailTab === 'abstract_en' && <div className="text-[var(--fluent-foreground)] text-lg leading-9 font-serif italic">{wp.paper.abstract_en || 'No English abstract available'}</div>}
                                                 </div>
                                             </div>
                                         )}
@@ -526,7 +442,7 @@ export default function WorkspaceDetailPage() {
                             <div className="mb-4">
                                 <button
                                     onClick={() => setShowInviteModal(true)}
-                                    className="px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition"
+                                    className="fluent-button fluent-button-accent px-4 py-3"
                                 >
                                     📨 邀请成员
                                 </button>
@@ -535,17 +451,17 @@ export default function WorkspaceDetailPage() {
 
                         <div className="space-y-3">
                             {workspace.members.map(member => (
-                                <div key={member.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex justify-between items-center">
+                                <div key={member.id} className="fluent-card p-4 flex justify-between items-center">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-white font-bold">
+                                        <div className="w-10 h-10 bg-[var(--fluent-surface-elevated)] rounded-full flex items-center justify-center text-[var(--fluent-foreground)] font-bold">
                                             {member.username.charAt(0).toUpperCase()}
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-white font-medium">{member.username}</span>
+                                                <span className="text-[var(--fluent-foreground)] font-medium">{member.username}</span>
                                                 {getRoleBadge(member.role)}
                                             </div>
-                                            <p className="text-xs text-gray-500">加入于 {new Date(member.joined_at).toLocaleDateString()}</p>
+                                            <p className="text-xs text-[var(--fluent-foreground-secondary)]">加入于 {new Date(member.joined_at).toLocaleDateString()}</p>
                                         </div>
                                     </div>
                                     {isAdmin && member.role !== 'owner' && member.user_id !== user?.id && (
@@ -554,7 +470,7 @@ export default function WorkspaceDetailPage() {
                                                 <select
                                                     value={member.role}
                                                     onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
-                                                    className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                                                    className="fluent-select px-3 py-2 text-sm"
                                                 >
                                                     <option value="member">成员</option>
                                                     <option value="admin">管理员</option>
@@ -562,7 +478,7 @@ export default function WorkspaceDetailPage() {
                                             )}
                                             <button
                                                 onClick={() => handleRemoveMember(member.user_id, member.username)}
-                                                className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition"
+                                                className="fluent-button px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30"
                                             >
                                                 移除
                                             </button>
@@ -577,29 +493,29 @@ export default function WorkspaceDetailPage() {
 
             {/* 分享论文弹窗 */}
             {showShareModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fluent-modal-overlay">
                     <div
-                        className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg mx-4 max-h-[80vh] flex flex-col"
+                        className="fluent-modal-enhanced fluent-modal-zoom w-full max-w-lg mx-4 max-h-[80vh] flex flex-col"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="share-modal-title"
                         aria-describedby="share-modal-desc"
                     >
-                        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-                            <h3 id="share-modal-title" className="text-lg font-semibold text-white">📤 分享论文到空间</h3>
+                        <div className="fluent-modal-header">
+                            <h3 id="share-modal-title" className="fluent-modal-title">📤 分享论文到空间</h3>
                             <p id="share-modal-desc" className="sr-only">选择要分享的论文并确认分享。</p>
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="text-gray-400 hover:text-white"
+                                className="fluent-modal-close"
                                 aria-label="关闭弹窗"
                             >
                                 ✕
                             </button>
                         </div>
-                        <div className="p-4 flex-1 overflow-y-auto">
-                            <p className="text-gray-400 mb-4">选择要分享的论文：</p>
+                        <div className="fluent-modal-body flex-1 overflow-y-auto">
+                            <p className="text-[var(--fluent-foreground-secondary)] mb-4">选择要分享的论文：</p>
                             {myPapers.length === 0 ? (
-                                <p className="text-gray-500 text-center py-8">暂无可分享的论文</p>
+                                <p className="text-[var(--fluent-foreground-secondary)] text-center py-8">暂无可分享的论文</p>
                             ) : (
                                 <div className="space-y-2">
                                     {myPapers.map(paper => {
@@ -607,7 +523,7 @@ export default function WorkspaceDetailPage() {
                                         return (
                                             <label
                                                 key={paper.id}
-                                                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${isShared ? 'bg-gray-700/50 cursor-not-allowed' : selectedPaperIds.has(paper.id) ? 'bg-purple-600/30 border border-purple-500' : 'bg-slate-700 border border-transparent hover:bg-slate-600'}`}
+                                                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${isShared ? 'bg-white/5 cursor-not-allowed' : selectedPaperIds.has(paper.id) ? 'bg-purple-600/20 border border-purple-500/60' : 'bg-[var(--fluent-surface)] border border-transparent hover:bg-[var(--fluent-surface-elevated)]'}`}
                                             >
                                                 <input
                                                     type="checkbox"
@@ -622,11 +538,11 @@ export default function WorkspaceDetailPage() {
                                                             return next;
                                                         });
                                                     }}
-                                                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-purple-600 focus:ring-purple-500"
+                                                    className="fluent-checkbox"
                                                 />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className={`truncate ${isShared ? 'text-gray-500' : 'text-white'}`}>{paper.title}</p>
-                                                    <p className="text-xs text-gray-500 truncate">{paper.authors} | {paper.year}</p>
+                                                    <p className={`truncate ${isShared ? 'text-[var(--fluent-foreground-secondary)]' : 'text-[var(--fluent-foreground)]'}`}>{paper.title}</p>
+                                                    <p className="text-xs text-[var(--fluent-foreground-secondary)] truncate">{paper.authors} | {paper.year}</p>
                                                 </div>
                                                 {isShared && <span className="text-xs text-green-500">已分享</span>}
                                             </label>
@@ -635,11 +551,11 @@ export default function WorkspaceDetailPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="p-4 border-t border-slate-700 flex justify-between items-center">
-                            <span className="text-gray-400">已选择 {selectedPaperIds.size} 篇</span>
+                        <div className="fluent-modal-footer flex justify-between items-center">
+                            <span className="text-[var(--fluent-foreground-secondary)]">已选择 {selectedPaperIds.size} 篇</span>
                             <div className="flex gap-2">
-                                <button onClick={() => setShowShareModal(false)} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">取消</button>
-                                <button onClick={handleSharePapers} disabled={selectedPaperIds.size === 0 || actionLoading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                                <button onClick={() => setShowShareModal(false)} className="fluent-button fluent-button-subtle px-4 py-2">取消</button>
+                                <button onClick={handleSharePapers} disabled={selectedPaperIds.size === 0 || actionLoading} className="fluent-button fluent-button-accent px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
                                     {actionLoading ? '分享中...' : '分享'}
                                 </button>
                             </div>
@@ -650,38 +566,38 @@ export default function WorkspaceDetailPage() {
 
             {/* 邀请成员弹窗 */}
             {showInviteModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fluent-modal-overlay">
                     <div
-                        className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4"
+                        className="fluent-modal-enhanced fluent-modal-zoom w-full max-w-md mx-4"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="invite-modal-title"
                         aria-describedby="invite-modal-desc"
                     >
-                        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-                            <h3 id="invite-modal-title" className="text-lg font-semibold text-white">📨 邀请成员</h3>
+                        <div className="fluent-modal-header">
+                            <h3 id="invite-modal-title" className="fluent-modal-title">📨 邀请成员</h3>
                             <p id="invite-modal-desc" className="sr-only">输入用户名后发送邀请。</p>
                             <button
                                 onClick={() => setShowInviteModal(false)}
-                                className="text-gray-400 hover:text-white"
+                                className="fluent-modal-close"
                                 aria-label="关闭弹窗"
                             >
                                 ✕
                             </button>
                         </div>
-                        <div className="p-4">
-                            <label className="block text-sm text-gray-400 mb-2">输入用户名</label>
+                        <div className="fluent-modal-body">
+                            <label className="block text-sm text-[var(--fluent-foreground-secondary)] mb-2">输入用户名</label>
                             <input
                                 type="text"
                                 value={inviteUsername}
                                 onChange={(e) => setInviteUsername(e.target.value)}
                                 placeholder="要邀请的用户名"
-                                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+                                className="fluent-input w-full"
                             />
                         </div>
-                        <div className="p-4 border-t border-slate-700 flex justify-end gap-2">
-                            <button onClick={() => setShowInviteModal(false)} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">取消</button>
-                            <button onClick={handleInviteUser} disabled={!inviteUsername.trim() || actionLoading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                        <div className="fluent-modal-footer flex justify-end gap-2">
+                            <button onClick={() => setShowInviteModal(false)} className="fluent-button fluent-button-subtle px-4 py-2">取消</button>
+                            <button onClick={handleInviteUser} disabled={!inviteUsername.trim() || actionLoading} className="fluent-button fluent-button-accent px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
                                 {actionLoading ? '发送中...' : '发送邀请'}
                             </button>
                         </div>
@@ -691,57 +607,57 @@ export default function WorkspaceDetailPage() {
 
             {/* 编辑空间弹窗 */}
             {showEditModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fluent-modal-overlay">
                     <div
-                        className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4"
+                        className="fluent-modal-enhanced fluent-modal-zoom w-full max-w-md mx-4"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="edit-modal-title"
                         aria-describedby="edit-modal-desc"
                     >
-                        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-                            <h3 id="edit-modal-title" className="text-lg font-semibold text-white">⚙️ 空间设置</h3>
+                        <div className="fluent-modal-header">
+                            <h3 id="edit-modal-title" className="fluent-modal-title">⚙️ 空间设置</h3>
                             <p id="edit-modal-desc" className="sr-only">修改空间名称或描述并保存。</p>
                             <button
                                 onClick={() => setShowEditModal(false)}
-                                className="text-gray-400 hover:text-white"
+                                className="fluent-modal-close"
                                 aria-label="关闭弹窗"
                             >
                                 ✕
                             </button>
                         </div>
-                        <div className="p-4 space-y-4">
+                        <div className="fluent-modal-body space-y-4">
                             <div>
-                                <label className="block text-sm text-gray-400 mb-2">空间名称</label>
+                                <label className="block text-sm text-[var(--fluent-foreground-secondary)] mb-2">空间名称</label>
                                 <input
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+                                    className="fluent-input w-full"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400 mb-2">空间描述（可选）</label>
+                                <label className="block text-sm text-[var(--fluent-foreground-secondary)] mb-2">空间描述（可选）</label>
                                 <textarea
                                     value={editDesc}
                                     onChange={(e) => setEditDesc(e.target.value)}
                                     rows={3}
-                                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none resize-none"
+                                    className="fluent-input w-full resize-none"
                                 />
                             </div>
                         </div>
-                        <div className="p-4 border-t border-slate-700 flex justify-between">
+                        <div className="fluent-modal-footer flex justify-between">
                             {isOwner && (
                                 <button
                                     onClick={handleDeleteWorkspace}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                                    className="fluent-button px-4 py-2 bg-red-600/80 text-white hover:bg-red-700"
                                 >
                                     🗑️ 删除空间
                                 </button>
                             )}
                             <div className="flex gap-2 ml-auto">
-                                <button onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">取消</button>
-                                <button onClick={handleUpdateWorkspace} disabled={!editName.trim() || actionLoading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                                <button onClick={() => setShowEditModal(false)} className="fluent-button fluent-button-subtle px-4 py-2">取消</button>
+                                <button onClick={handleUpdateWorkspace} disabled={!editName.trim() || actionLoading} className="fluent-button fluent-button-accent px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
                                     {actionLoading ? '保存中...' : '保存'}
                                 </button>
                             </div>
