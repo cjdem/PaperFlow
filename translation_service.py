@@ -6,6 +6,7 @@
 import os
 import asyncio
 import time
+import contextlib
 from pathlib import Path
 from typing import Optional, AsyncGenerator, Dict, Any
 from datetime import datetime
@@ -13,6 +14,7 @@ from datetime import datetime
 from log_service import get_logger
 from db_models import Session, Paper, TranslationLLMProvider, TranslationLog
 from settings import settings
+from llm_format import normalize_translation_request_format
 
 logger = get_logger("translation_service")
 
@@ -56,10 +58,47 @@ class TranslationService:
         )
         
         # 构建翻译引擎设置
-        engine_type = provider.engine_type.lower()
+        engine_type = (provider.engine_type or "").lower()
+        request_format = normalize_translation_request_format(
+            getattr(provider, "request_format", None),
+            engine_type=engine_type,
+        )
+        has_explicit_request_format = bool((getattr(provider, "request_format", None) or "").strip())
+        legacy_engine_types = {
+            "deepseek", "google", "deepl", "ollama", "azure",
+            "siliconflow", "zhipu", "groq", "aliyundashscope", "openaicompatible"
+        }
+        use_legacy_engine = engine_type in legacy_engine_types and request_format == "openai"
         translate_engine_settings = None
-        
-        if engine_type == "openai":
+
+        # 新标准格式优先；若旧数据未配置 request_format，则保持原 engine_type 行为
+        if has_explicit_request_format and not use_legacy_engine:
+            if request_format == "gemini":
+                translate_engine_settings = OpenAICompatibleSettings(
+                    openai_compatible_api_key=provider.api_key,
+                    openai_compatible_base_url=provider.base_url or "https://generativelanguage.googleapis.com/v1beta/openai",
+                    openai_compatible_model=provider.model or "gemini-2.0-flash",
+                )
+            elif request_format == "anthropic":
+                translate_engine_settings = OpenAICompatibleSettings(
+                    openai_compatible_api_key=provider.api_key,
+                    openai_compatible_base_url=provider.base_url or "https://api.anthropic.com/v1",
+                    openai_compatible_model=provider.model or "claude-3-5-sonnet-20241022",
+                )
+            elif request_format == "openai_response":
+                # 当前翻译底层为 chat completions，先兼容降级到 OpenAI 兼容调用
+                translate_engine_settings = OpenAICompatibleSettings(
+                    openai_compatible_api_key=provider.api_key,
+                    openai_compatible_base_url=provider.base_url or "https://api.openai.com/v1",
+                    openai_compatible_model=provider.model or "gpt-4o-mini",
+                )
+            else:
+                translate_engine_settings = OpenAISettings(
+                    openai_api_key=provider.api_key,
+                    openai_base_url=provider.base_url or "https://api.openai.com/v1",
+                    openai_model=provider.model or "gpt-4o-mini",
+                )
+        elif engine_type == "openai":
             translate_engine_settings = OpenAISettings(
                 openai_api_key=provider.api_key,
                 openai_base_url=provider.base_url or "https://api.openai.com/v1",
@@ -123,7 +162,7 @@ class TranslationService:
             # 默认使用 OpenAI 兼容模式
             translate_engine_settings = OpenAICompatibleSettings(
                 openai_compatible_api_key=provider.api_key,
-                openai_compatible_base_url=provider.base_url,
+                openai_compatible_base_url=provider.base_url or "https://api.openai.com/v1",
                 openai_compatible_model=provider.model or "gpt-4o-mini",
             )
         
@@ -151,6 +190,29 @@ class TranslationService:
         )
         
         return settings
+
+    @contextlib.contextmanager
+    def _temporary_proxy_env(self, proxy: Optional[str]):
+        """
+        翻译链路代理兼容：通过环境变量注入给底层 SDK/httpx。
+        """
+        proxy_value = (proxy or "").strip()
+        if not proxy_value:
+            yield
+            return
+
+        keys = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]
+        original = {key: os.environ.get(key) for key in keys}
+        try:
+            for key in keys:
+                os.environ[key] = proxy_value
+            yield
+        finally:
+            for key, value in original.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
     
     def _log_to_db(
         self, 
@@ -193,12 +255,17 @@ class TranslationService:
 
         sample_text = "Hello"
         start_time = time.monotonic()
+        request_format = normalize_translation_request_format(
+            getattr(provider, "request_format", None),
+            engine_type=getattr(provider, "engine_type", None),
+        )
 
         def _run_test() -> str:
             settings_model = self._build_settings(provider, output_dir)
             from pdf2zh_next.translator import get_translator
-            translator = get_translator(settings_model)
-            return translator.translate(sample_text, ignore_cache=True)
+            with self._temporary_proxy_env(getattr(provider, "proxy", None)):
+                translator = get_translator(settings_model)
+                return translator.translate(sample_text, ignore_cache=True)
 
         result = await asyncio.to_thread(_run_test)
         latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -209,11 +276,16 @@ class TranslationService:
             except Exception:
                 sample = ""
 
+        message = "联通成功"
+        if request_format == "openai_response":
+            message = "联通成功（翻译链路已按 Chat Completions 兼容模式测试）"
+
         return {
             "success": True,
-            "message": "联通成功",
+            "message": message,
             "latency_ms": latency_ms,
             "engine_type": provider.engine_type,
+            "request_format": request_format,
             "model": provider.model,
             "sample": sample[:200]
         }
@@ -341,9 +413,25 @@ class TranslationService:
                 f"开始翻译论文: {paper.title or paper_id}",
                 task_id=task_id,
                 paper_id=paper_id,
-                details={"provider": provider.name, "engine": provider.engine_type}
+                details={
+                    "provider": provider.name,
+                    "engine": provider.engine_type,
+                    "request_format": normalize_translation_request_format(
+                        getattr(provider, "request_format", None),
+                        engine_type=getattr(provider, "engine_type", None),
+                    ),
+                }
             )
             logger.info(f"[task_{task_id}] 开始翻译论文: {paper_id}, 使用提供商: {provider.name}")
+
+            # 设置任务级代理环境（若配置了 proxy）
+            proxy_env_keys = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]
+            proxy_backup: dict[str, str | None] = {}
+            proxy_value = (getattr(provider, "proxy", None) or "").strip()
+            if proxy_value:
+                proxy_backup = {key: os.environ.get(key) for key in proxy_env_keys}
+                for key in proxy_env_keys:
+                    os.environ[key] = proxy_value
             
             # 构建配置
             output_dir = str(Path(pdf_path).parent)
@@ -463,6 +551,16 @@ class TranslationService:
             yield {"type": "error", "error": error_msg}
         
         finally:
+            # 恢复代理环境变量
+            try:
+                if "proxy_backup" in locals():
+                    for key, value in proxy_backup.items():
+                        if value is None:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = value
+            except Exception:
+                pass
             session.close()
 
 

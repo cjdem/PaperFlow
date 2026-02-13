@@ -38,6 +38,7 @@ interface LLMProvider {
     api_key: string;
     models: string;
     api_type: string;
+    request_format?: string;
     pool_type: string;
     weight: number;
     priority: number;
@@ -56,6 +57,7 @@ const createEmptyProvider = (poolType: string): Omit<LLMProvider, 'id' | 'is_pri
     api_key: '',
     models: '',
     api_type: 'openai',
+    request_format: 'openai',
     pool_type: poolType,
     weight: 10,
     priority: 1,
@@ -66,6 +68,11 @@ const API_TYPE_INFO: Record<string, { label: string; urlHint: string; keyHint: s
     openai: {
         label: 'OpenAI 兼容',
         urlHint: 'https://api.openai.com/v1 或 https://api.deepseek.com/v1',
+        keyHint: 'sk-...',
+    },
+    openai_response: {
+        label: 'OpenAI Responses',
+        urlHint: 'https://api.openai.com/v1 或兼容 Responses 的网关',
         keyHint: 'sk-...',
     },
     gemini: {
@@ -167,6 +174,7 @@ export default function AdminPage() {
             api_key: p.api_key,
             models: p.models,
             api_type: p.api_type,
+            request_format: p.request_format || p.api_type,
             pool_type: p.pool_type,
             weight: p.weight,
             priority: p.priority,
@@ -307,7 +315,8 @@ export default function AdminPage() {
     const renderProviderForm = () => {
         if (!isAdding && !editingProvider) return null;
 
-        const apiInfo = API_TYPE_INFO[formData.api_type] || API_TYPE_INFO.openai;
+        const selectedFormat = formData.request_format || formData.api_type || 'openai';
+        const apiInfo = API_TYPE_INFO[selectedFormat] || API_TYPE_INFO.openai;
 
         return (
             <div className="fluent-card p-6 border-2 border-purple-500/50 mb-6 fluent-scale-in">
@@ -328,11 +337,16 @@ export default function AdminPage() {
                     <div>
                         <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">API 类型</label>
                         <select
-                            value={formData.api_type}
-                            onChange={e => setFormData({ ...formData, api_type: e.target.value })}
+                            value={selectedFormat}
+                            onChange={e => setFormData({
+                                ...formData,
+                                request_format: e.target.value,
+                                api_type: e.target.value === 'openai_response' ? 'openai' : e.target.value
+                            })}
                             className="fluent-select w-full"
                         >
-                            <option value="openai">OpenAI 兼容 (OpenAI/DeepSeek/通义千问等)</option>
+                            <option value="openai">OpenAI Chat Completions</option>
+                            <option value="openai_response">OpenAI Responses</option>
                             <option value="gemini">Google Gemini</option>
                             <option value="anthropic">Anthropic Claude</option>
                         </select>
@@ -432,7 +446,7 @@ export default function AdminPage() {
                             {p.enabled ? '✓ 启用' : '○ 禁用'}
                         </span>
                         <span className="fluent-badge px-2.5 py-1 text-xs">
-                            {API_TYPE_INFO[p.api_type]?.label || p.api_type}
+                            {API_TYPE_INFO[p.request_format || p.api_type]?.label || p.request_format || p.api_type}
                         </span>
                     </div>
                     <div className="text-sm text-[var(--fluent-foreground-secondary)] space-y-1.5">

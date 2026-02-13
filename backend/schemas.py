@@ -131,6 +131,7 @@ class LLMProviderResponse(BaseModel):
     proxy: Optional[str] = None
     pool_type: str
     api_type: str
+    request_format: str = "openai"
     is_primary: bool
     weight: int  # 保留向后兼容
     priority: int  # 优先级 (1 最高, 数值越小越优先)
@@ -152,6 +153,7 @@ class CreateLLMProviderRequest(BaseModel):
     proxy: Optional[str] = None
     pool_type: str
     api_type: str = "openai"
+    request_format: Optional[str] = None
     models: str
     is_primary: bool = False
     weight: int = 10  # 保留向后兼容
@@ -165,6 +167,7 @@ class UpdateLLMProviderRequest(BaseModel):
     proxy: Optional[str] = None
     models: Optional[str] = None
     api_type: Optional[str] = None
+    request_format: Optional[str] = None
     pool_type: Optional[str] = None
     weight: Optional[int] = None  # 保留向后兼容
     priority: Optional[int] = None  # 优先级 (1 最高)
@@ -364,9 +367,11 @@ class TranslationQueueStats(BaseModel):
 class TranslationProviderCreate(BaseModel):
     """创建/更新翻译提供商"""
     name: str
-    engine_type: str  # openai, deepseek, google, deepl, ollama, gemini, azure
+    engine_type: Optional[str] = None  # 兼容旧字段
+    request_format: Optional[str] = None  # openai/openai_response/gemini/anthropic
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+    proxy: Optional[str] = None
     model: Optional[str] = None
     priority: int = 100
     qps: int = 4
@@ -381,7 +386,9 @@ class TranslationProviderResponse(BaseModel):
     id: int
     name: str
     engine_type: str
+    request_format: str = "openai"
     base_url: Optional[str] = None
+    proxy: Optional[str] = None
     model: Optional[str] = None
     priority: int
     qps: int

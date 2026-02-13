@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from db_service import get_db_session, SessionLocal
 from db_models import LLMProvider
+from llm_format import normalize_request_format, format_to_legacy_api_type
 
 
 # ================= CRUD 操作 =================
@@ -26,6 +27,10 @@ def get_all_providers(pool_type: str = None) -> list[dict]:
                 "api_key": p.api_key,
                 "pool_type": p.pool_type,
                 "api_type": getattr(p, 'api_type', 'openai'),
+                "request_format": normalize_request_format(
+                    getattr(p, "request_format", None),
+                    api_type=getattr(p, "api_type", None),
+                ),
                 "is_primary": p.is_primary,
                 "weight": getattr(p, 'weight', 10),
                 "models": p.models,
@@ -60,6 +65,10 @@ def get_enabled_providers(pool_type: str) -> list[dict]:
                 "proxy": getattr(p, "proxy", None),
                 "api_key": p.api_key,
                 "api_type": getattr(p, 'api_type', 'openai'),
+                "request_format": normalize_request_format(
+                    getattr(p, "request_format", None),
+                    api_type=getattr(p, "api_type", None),
+                ),
                 "models": p.models,
                 "is_primary": p.is_primary,
                 "weight": getattr(p, 'weight', 10),
@@ -100,7 +109,7 @@ def mark_provider_failure(provider_id: int, error: str) -> None:
 
 def add_provider(name: str, base_url: str, api_key: str, pool_type: str, 
                  models: str, is_primary: bool = False, weight: int = 10, api_type: str = "openai",
-                 proxy: str | None = None) -> int:
+                 proxy: str | None = None, request_format: str | None = None) -> int:
     """添加新的提供商"""
     with get_db_session() as session:
         # 如果设置为主模型，先取消其他主模型
@@ -109,13 +118,15 @@ def add_provider(name: str, base_url: str, api_key: str, pool_type: str,
                 LLMProvider.pool_type == pool_type, LLMProvider.is_primary == True
             ).update({"is_primary": False})
         
+        normalized_request_format = normalize_request_format(request_format, api_type=api_type)
         provider = LLMProvider(
             name=name,
             base_url=base_url,
             api_key=api_key,
             proxy=proxy,
             pool_type=pool_type,
-            api_type=api_type,
+            api_type=format_to_legacy_api_type(normalized_request_format),
+            request_format=normalized_request_format,
             models=models,
             is_primary=is_primary,
             weight=weight,
@@ -140,6 +151,14 @@ def update_provider(provider_id: int, **kwargs) -> bool:
                 LLMProvider.is_primary == True,
                 LLMProvider.id != provider_id
             ).update({"is_primary": False})
+
+        if "request_format" in kwargs or "api_type" in kwargs:
+            normalized_request_format = normalize_request_format(
+                kwargs.get("request_format", getattr(provider, "request_format", None)),
+                api_type=kwargs.get("api_type", getattr(provider, "api_type", None)),
+            )
+            kwargs["request_format"] = normalized_request_format
+            kwargs["api_type"] = format_to_legacy_api_type(normalized_request_format)
         
         for key, value in kwargs.items():
             if hasattr(provider, key):
@@ -219,6 +238,7 @@ def import_from_json(json_path: str = "llm_config.json") -> int:
                 weight=entry.get("weight", 10),  # 使用权重
                 api_type=entry.get("api_type", "openai"),  # 读取 api_type，默认 openai
                 proxy=entry.get("proxy", None),
+                request_format=entry.get("request_format", None),
             )
             count += 1
     

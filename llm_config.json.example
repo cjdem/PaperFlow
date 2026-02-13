@@ -5,6 +5,7 @@
       "api_key": "sk-your-openai-api-key-here",
       "model": "gpt-4o-mini",
       "priority": 1,
+      "request_format": "openai",
       "api_type": "openai",
       "proxy": ""
     },
@@ -13,6 +14,7 @@
       "api_key": "your-gemini-api-key-here",
       "model": "gemini-2.0-flash-exp",
       "priority": 2,
+      "request_format": "gemini",
       "api_type": "gemini",
       "proxy": ""
     },
@@ -21,6 +23,7 @@
       "api_key": "sk-your-deepseek-api-key-here",
       "model": "deepseek-chat",
       "priority": 3,
+      "request_format": "openai",
       "api_type": "openai",
       "proxy": ""
     }
@@ -31,6 +34,7 @@
       "api_key": "sk-your-openai-api-key-here",
       "model": "gpt-4o",
       "priority": 1,
+      "request_format": "openai",
       "api_type": "openai",
       "proxy": ""
     },
@@ -39,6 +43,7 @@
       "api_key": "your-gemini-api-key-here",
       "model": "gemini-2.0-flash-thinking-exp",
       "priority": 1,
+      "request_format": "gemini",
       "api_type": "gemini",
       "proxy": ""
     },
@@ -47,6 +52,7 @@
       "api_key": "sk-ant-your-claude-api-key-here",
       "model": "claude-3-5-sonnet-20241022",
       "priority": 2,
+      "request_format": "anthropic",
       "api_type": "anthropic",
       "proxy": ""
     }
@@ -61,6 +67,7 @@
       "proxy": "可选代理地址（http:// 或 https://），留空不使用",
       "model": "模型名称，支持逗号分隔多个模型",
       "priority": "优先级（1为最高），数值越小越优先尝试",
+      "request_format": "标准请求格式: openai/openai_response/gemini/anthropic",
       "api_type": "API 类型，可选值: 'openai', 'gemini' 或 'anthropic'"
     },
     "顺序故障转移": "系统会按 priority 顺序尝试模型 (1->2->3)，每个模型重试 N 次（默认3次）后切换到下一个",

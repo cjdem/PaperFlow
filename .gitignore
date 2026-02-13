@@ -158,3 +158,8 @@ Desktop.ini
 .env.*.local
 frontend/.env.local
 frontend/.env.*.local
+
+# Local tool caches
+.ruff_cache/
+.eslintcache
+frontend/.turbo/

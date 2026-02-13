@@ -33,7 +33,9 @@ interface Provider {
   id: number;
   name: string;
   engine_type: string;
+  request_format?: string;
   base_url: string | null;
+  proxy?: string | null;
   api_key?: string;
   model: string | null;
   priority: number;
@@ -48,8 +50,10 @@ interface Provider {
 
 interface ProviderFormData {
   name: string;
+  request_format: string;
   engine_type: string;
   base_url: string;
+  proxy: string;
   api_key: string;
   model: string;
   priority: number;
@@ -60,26 +64,20 @@ interface ProviderFormData {
   enabled: boolean;
 }
 
-// 引擎类型配置
-const ENGINE_TYPES = [
-  { value: 'openai', label: 'OpenAI', hint: 'https://api.openai.com/v1' },
-  { value: 'openaicompatible', label: 'OpenAI 兼容', hint: '自定义 OpenAI 兼容 API' },
-  { value: 'deepseek', label: 'DeepSeek', hint: 'https://api.deepseek.com/v1' },
-  { value: 'siliconflow', label: 'SiliconFlow', hint: 'https://api.siliconflow.cn/v1' },
-  { value: 'aliyundashscope', label: '阿里云 DashScope', hint: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { value: 'zhipu', label: '智谱 AI', hint: 'https://open.bigmodel.cn/api/paas/v4' },
-  { value: 'groq', label: 'Groq', hint: 'https://api.groq.com/openai/v1' },
-  { value: 'gemini', label: 'Google Gemini', hint: '无需 Base URL' },
-  { value: 'google', label: 'Google Translate', hint: '无需 Base URL' },
-  { value: 'deepl', label: 'DeepL', hint: '无需 Base URL' },
-  { value: 'ollama', label: 'Ollama 本地', hint: 'http://localhost:11434' },
-  { value: 'azure', label: 'Azure Translator', hint: 'https://api.translator.azure.cn' }
+// 标准请求格式配置
+const REQUEST_FORMATS = [
+  { value: 'openai', label: 'OpenAI Chat', hint: 'https://api.openai.com/v1' },
+  { value: 'openai_response', label: 'OpenAI Responses', hint: 'https://api.openai.com/v1 或兼容 Responses 的网关' },
+  { value: 'gemini', label: 'Google Gemini', hint: 'https://generativelanguage.googleapis.com/v1beta/openai 或兼容网关' },
+  { value: 'anthropic', label: 'Anthropic Claude', hint: 'https://api.anthropic.com/v1 或兼容网关' }
 ];
 
 const createEmptyFormData = (): ProviderFormData => ({
   name: '',
+  request_format: 'openai',
   engine_type: 'openai',
   base_url: '',
+  proxy: '',
   api_key: '',
   model: '',
   priority: 100,
@@ -207,10 +205,13 @@ export default function TranslationMonitor() {
 
   // 开始编辑
   const handleEdit = (provider: Provider) => {
+    const requestFormat = provider.request_format || provider.engine_type || 'openai';
     setFormData({
       name: provider.name,
-      engine_type: provider.engine_type,
+      request_format: requestFormat,
+      engine_type: requestFormat,
       base_url: provider.base_url || '',
+      proxy: provider.proxy || '',
       api_key: '', // 不回显 API Key
       model: provider.model || '',
       priority: provider.priority,
@@ -275,6 +276,7 @@ export default function TranslationMonitor() {
         message: string;
         latency_ms?: number;
         engine_type?: string;
+        request_format?: string;
         model?: string;
         sample?: string;
       }>(`/api/translate/providers/${provider.id}/test`);
@@ -555,15 +557,19 @@ export default function TranslationMonitor() {
                   />
                 </div>
                 
-                {/* 引擎类型 */}
+                {/* 请求格式 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">引擎类型</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">请求格式</label>
                   <select
-                    value={formData.engine_type}
-                    onChange={e => setFormData({...formData, engine_type: e.target.value})}
+                    value={formData.request_format}
+                    onChange={e => setFormData({
+                      ...formData,
+                      request_format: e.target.value,
+                      engine_type: e.target.value
+                    })}
                     className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
                   >
-                    {ENGINE_TYPES.map(t => (
+                    {REQUEST_FORMATS.map(t => (
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
                   </select>
@@ -576,12 +582,24 @@ export default function TranslationMonitor() {
                     type="text"
                     value={formData.base_url}
                     onChange={e => setFormData({...formData, base_url: e.target.value})}
-                    placeholder={ENGINE_TYPES.find(t => t.value === formData.engine_type)?.hint || ''}
+                    placeholder={REQUEST_FORMATS.find(t => t.value === formData.request_format)?.hint || ''}
                     className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
                   />
                   <p className="text-xs text-gray-400 mt-1.5">
-                    💡 提示：{ENGINE_TYPES.find(t => t.value === formData.engine_type)?.hint || '请输入 API 地址'}
+                    💡 提示：{REQUEST_FORMATS.find(t => t.value === formData.request_format)?.hint || '请输入 API 地址'}
                   </p>
+                </div>
+
+                {/* Proxy */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Proxy（可选）</label>
+                  <input
+                    type="text"
+                    value={formData.proxy}
+                    onChange={e => setFormData({...formData, proxy: e.target.value})}
+                    placeholder="http://127.0.0.1:7890"
+                    className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                  />
                 </div>
                 
                 {/* API Key */}
@@ -716,7 +734,7 @@ export default function TranslationMonitor() {
               <thead className="bg-slate-700/50">
                 <tr>
                   <th className="px-5 py-4 text-left text-gray-200 text-sm font-semibold">名称</th>
-                  <th className="px-5 py-4 text-left text-gray-200 text-sm font-semibold">引擎类型</th>
+                  <th className="px-5 py-4 text-left text-gray-200 text-sm font-semibold">请求格式</th>
                   <th className="px-5 py-4 text-left text-gray-200 text-sm font-semibold">模型</th>
                   <th className="px-5 py-4 text-left text-gray-200 text-sm font-semibold">API Key</th>
                   <th className="px-5 py-4 text-left text-gray-200 text-sm font-semibold">优先级</th>
@@ -745,7 +763,7 @@ export default function TranslationMonitor() {
                       <td className="px-5 py-4 text-white text-sm font-medium">{provider.name}</td>
                       <td className="px-5 py-4 text-gray-300 text-sm">
                         <span className="px-2.5 py-1 bg-slate-700 rounded-full text-xs font-medium">
-                          {ENGINE_TYPES.find(t => t.value === provider.engine_type)?.label || provider.engine_type}
+                          {REQUEST_FORMATS.find(t => t.value === (provider.request_format || provider.engine_type))?.label || provider.request_format || provider.engine_type}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-purple-300 text-sm font-medium">{provider.model || '-'}</td>
@@ -812,7 +830,7 @@ export default function TranslationMonitor() {
               <li>• <strong className="text-yellow-400">优先级越小越优先</strong>：系统会按优先级顺序尝试翻译引擎</li>
               <li>• <strong className="text-green-400">QPS 限制</strong>：控制每秒请求数，避免触发 API 限流</li>
               <li>• <strong className="text-purple-400">性能优化</strong>：提高 QPS 和工作线程数可加速翻译，但需注意 API 限制</li>
-              <li>• 支持的引擎类型：OpenAI、DeepSeek、SiliconFlow、阿里云 DashScope、智谱 AI、Groq、Gemini、Google Translate、DeepL、Ollama、Azure</li>
+              <li>• 标准请求格式：OpenAI Chat、OpenAI Responses、Gemini、Anthropic</li>
             </ul>
           </div>
           

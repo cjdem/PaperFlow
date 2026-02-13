@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
 from llm_pool import llm_manager, GeminiClientWrapper, AnthropicClientWrapper, build_httpx_client
 from file_service import file_service
+from llm_format import normalize_request_format, format_to_legacy_api_type
 
 from deps import get_db, get_current_admin
 from llm_service import mark_provider_success, mark_provider_failure
@@ -54,7 +55,10 @@ def _pick_first(value: str) -> str:
 async def _test_provider_connectivity(provider: LLMProvider) -> dict:
     api_key = _pick_first(provider.api_key)
     model = _pick_first(provider.models)
-    api_type = (provider.api_type or "openai").lower()
+    request_format = normalize_request_format(
+        getattr(provider, "request_format", None),
+        api_type=(provider.api_type or "openai"),
+    )
     base_url = (provider.base_url or "").strip()
     base_url = base_url.rstrip("/") if base_url else None
     proxy = (getattr(provider, "proxy", None) or "").strip() or None
@@ -70,7 +74,7 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
     try:
         response_format = {"type": "text"}
 
-        if api_type == "gemini":
+        if request_format == "gemini":
             client = GeminiClientWrapper(api_key=api_key, base_url=base_url, proxy=proxy)
             response = await client.create_chat_completion(
                 model=model,
@@ -78,7 +82,7 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
                 temperature=0,
                 response_format=response_format
             )
-        elif api_type == "anthropic":
+        elif request_format == "anthropic":
             client = AnthropicClientWrapper(api_key=api_key, base_url=base_url, proxy=proxy)
             response = await client.create_chat_completion(
                 model=model,
@@ -86,6 +90,28 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
                 temperature=0,
                 max_tokens=32,
                 response_format=response_format
+            )
+        elif request_format == "openai_response":
+            timeout = httpx.Timeout(30.0, connect=10.0)
+            if proxy:
+                http_client = build_httpx_client(timeout, proxy)
+                client = AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    http_client=http_client
+                )
+            else:
+                client = AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=timeout
+                )
+            response = await client.responses.create(
+                model=model,
+                input=messages,
+                temperature=0,
+                text={"format": {"type": "text"}},
+                max_output_tokens=32
             )
         else:
             timeout = httpx.Timeout(30.0, connect=10.0)
@@ -128,7 +154,9 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
         mark_provider_success(provider.id, latency_ms)
         content = ""
         try:
-            if response and response.choices:
+            if request_format == "openai_response":
+                content = getattr(response, "output_text", "") or ""
+            elif response and response.choices:
                 content = response.choices[0].message.content or ""
         except Exception:
             content = ""
@@ -138,7 +166,8 @@ async def _test_provider_connectivity(provider: LLMProvider) -> dict:
             "message": "联通成功",
             "latency_ms": latency_ms,
             "model": model,
-            "api_type": api_type,
+            "api_type": format_to_legacy_api_type(request_format),
+            "request_format": request_format,
             "sample": content[:200]
         }
     except Exception as e:
@@ -216,6 +245,10 @@ async def get_llm_providers(
             proxy=getattr(p, "proxy", None),
             pool_type=p.pool_type,
             api_type=getattr(p, 'api_type', 'openai'),
+            request_format=normalize_request_format(
+                getattr(p, "request_format", None),
+                api_type=getattr(p, "api_type", None),
+            ),
             is_primary=p.is_primary,
             weight=getattr(p, 'weight', 10),
             priority=getattr(p, 'priority', 1),
@@ -243,14 +276,16 @@ async def create_llm_provider(
             LLMProvider.pool_type == request.pool_type,
             LLMProvider.is_primary == True
         ).update({"is_primary": False})
-    
+    request_format = normalize_request_format(request.request_format, api_type=request.api_type)
+
     provider = LLMProvider(
         name=request.name,
         base_url=request.base_url,
         api_key=request.api_key,
         proxy=request.proxy,
         pool_type=request.pool_type,
-        api_type=request.api_type,
+        api_type=format_to_legacy_api_type(request_format),
+        request_format=request_format,
         models=request.models,
         is_primary=request.is_primary,
         weight=request.weight,
@@ -270,6 +305,10 @@ async def create_llm_provider(
         proxy=getattr(provider, "proxy", None),
         pool_type=provider.pool_type,
         api_type=provider.api_type,
+        request_format=normalize_request_format(
+            getattr(provider, "request_format", None),
+            api_type=getattr(provider, "api_type", None),
+        ),
         is_primary=provider.is_primary,
         weight=provider.weight,
         priority=getattr(provider, 'priority', 1),
@@ -296,6 +335,16 @@ async def update_llm_provider(
     
     # 更新字段
     update_data = request.model_dump(exclude_unset=True)
+    request_format_input = update_data.pop("request_format", None)
+    api_type_input = update_data.pop("api_type", None)
+
+    resolved_request_format = normalize_request_format(
+        request_format_input if request_format_input is not None else getattr(provider, "request_format", None),
+        api_type=api_type_input if api_type_input is not None else getattr(provider, "api_type", None),
+    )
+    provider.request_format = resolved_request_format
+    provider.api_type = format_to_legacy_api_type(resolved_request_format)
+
     for key, value in update_data.items():
         if value is not None:
             setattr(provider, key, value)
@@ -312,6 +361,10 @@ async def update_llm_provider(
         proxy=getattr(provider, "proxy", None),
         pool_type=provider.pool_type,
         api_type=getattr(provider, 'api_type', 'openai'),
+        request_format=normalize_request_format(
+            getattr(provider, "request_format", None),
+            api_type=getattr(provider, "api_type", None),
+        ),
         is_primary=provider.is_primary,
         weight=getattr(provider, 'weight', 10),
         priority=getattr(provider, 'priority', 1),

@@ -16,6 +16,7 @@ from llm_service import get_enabled_providers, import_from_json, mark_provider_s
 from db_service import get_config
 from log_service import llm_logger, get_logger
 from settings import settings
+from llm_format import normalize_request_format, format_to_legacy_api_type
 
 logger = get_logger("llm_pool")
 
@@ -197,6 +198,45 @@ class AnthropicMessageWrapper:
             self.content = ""
 
 
+def _to_responses_text_config(response_format):
+    """
+    将 chat.completions 的 response_format 转为 responses API 的 text.format 配置。
+    """
+    if not response_format:
+        return None
+    if not isinstance(response_format, dict):
+        return None
+    format_type = response_format.get("type")
+    if format_type in {"text", "json_object"}:
+        return {"format": {"type": format_type}}
+    if format_type == "json_schema":
+        # 透传 JSON Schema 配置
+        return {"format": response_format}
+    return None
+
+
+class OpenAIResponsesWrapper:
+    """将 Responses API 响应包装为 chat.completions 兼容结构"""
+
+    def __init__(self, response):
+        self.choices = [OpenAIResponsesChoiceWrapper(response)]
+
+
+class OpenAIResponsesChoiceWrapper:
+    def __init__(self, response):
+        self.message = OpenAIResponsesMessageWrapper(response)
+
+
+class OpenAIResponsesMessageWrapper:
+    def __init__(self, response):
+        text = ""
+        try:
+            text = getattr(response, "output_text", "") or ""
+        except Exception:
+            text = ""
+        self.content = text
+
+
 class LLMManager:
     def __init__(self):
         # 首次启动时，尝试从 JSON 导入配置
@@ -225,7 +265,8 @@ class LLMManager:
             return "无可用配置"
         node = pool[0]
         primary_tag = " ✓主" if node.get('is_primary') else ""
-        return f"[{node['model']}] @ {node['provider']} ({node['api_type']}){primary_tag}"
+        request_format = node.get("request_format", node.get("api_type", "openai"))
+        return f"[{node['model']}] @ {node['provider']} ({request_format}){primary_tag}"
 
     def _build_pool(self, pool_type: str) -> list:
         """从数据库构建客户端池"""
@@ -238,13 +279,17 @@ class LLMManager:
             keys = [k.strip() for k in entry.get("api_key", "").split(",") if k.strip()]
             models = [m.strip() for m in entry.get("models", "").split(",") if m.strip()]
             weight = entry.get("weight", 10)
-            api_type = entry.get("api_type", "openai")
+            request_format = normalize_request_format(
+                entry.get("request_format", None),
+                api_type=entry.get("api_type", "openai"),
+            )
+            api_type = format_to_legacy_api_type(request_format)
 
             for key in keys:
                 # 根据 api_type 创建不同的客户端
-                if api_type == "gemini":
+                if request_format == "gemini":
                     client = GeminiClientWrapper(api_key=key, base_url=base_url or None, proxy=proxy)
-                elif api_type == "anthropic":
+                elif request_format == "anthropic":
                     client = AnthropicClientWrapper(api_key=key, base_url=base_url or None, proxy=proxy)
                 else:  # 默认 openai - 添加超时配置
                     timeout = httpx.Timeout(300.0, connect=30.0)
@@ -269,6 +314,7 @@ class LLMManager:
                         "model": model,
                         "provider": provider,
                         "api_type": api_type,
+                        "request_format": request_format,
                         "is_primary": entry.get("is_primary", False),
                         "weight": weight,
                         "priority": entry.get("priority", 1),
@@ -329,27 +375,39 @@ class LLMManager:
             # 对当前 Provider 进行最多 max_retries 次尝试
             for attempt in range(max_retries):
                 try:
+                    request_format = node.get("request_format", node.get("api_type", "openai"))
                     if attempt == 0:
-                        llm_logger.log_request(pool_name, provider_id, node['api_type'], node.get('priority', 1))
+                        llm_logger.log_request(pool_name, provider_id, request_format, node.get('priority', 1))
                     else:
                         llm_logger.log_retry(attempt, max_retries, provider_id, str(last_error))
 
                     start_time = time.monotonic()
                     # 根据 API 类型调用不同的方法
-                    if node["api_type"] == "gemini":
+                    if request_format == "gemini":
                         response = await node["client"].create_chat_completion(
                             model=node["model"],
                             messages=messages,
                             temperature=temperature,
                             response_format=response_format
                         )
-                    elif node["api_type"] == "anthropic":
+                    elif request_format == "anthropic":
                         response = await node["client"].create_chat_completion(
                             model=node["model"],
                             messages=messages,
                             temperature=temperature,
                             response_format=response_format
                         )
+                    elif request_format == "openai_response":
+                        kwargs = {
+                            "model": node["model"],
+                            "input": messages,
+                            "temperature": temperature,
+                        }
+                        text_config = _to_responses_text_config(response_format)
+                        if text_config:
+                            kwargs["text"] = text_config
+                        response_obj = await node["client"].responses.create(**kwargs)
+                        response = OpenAIResponsesWrapper(response_obj)
                     else:  # OpenAI
                         kwargs = {
                             "model": node["model"],
@@ -446,30 +504,44 @@ class LLMManager:
             # 对当前 Provider 进行最多 max_retries 次尝试
             for attempt in range(max_retries):
                 try:
+                    request_format = node.get("request_format", node.get("api_type", "openai"))
                     if attempt == 0:
-                        llm_logger.log_request(pool_name, provider_id, node['api_type'], node.get('priority', 1))
+                        llm_logger.log_request(pool_name, provider_id, request_format, node.get('priority', 1))
                     else:
                         llm_logger.log_retry(attempt, max_retries, provider_id, str(last_error))
 
                     start_time = time.monotonic()
                     # 目前只有 OpenAI 兼容 API 支持流式
-                    if node["api_type"] not in ["openai"]:
+                    if request_format != "openai":
                         # 对于不支持流式的 API，回退到普通调用
-                        logger.info(f"⚠️ {node['api_type']} 不支持流式，使用普通调用")
-                        if node["api_type"] == "gemini":
+                        logger.info(f"⚠️ {request_format} 不支持流式，使用普通调用")
+                        if request_format == "gemini":
                             response = await node["client"].create_chat_completion(
                                 model=node["model"],
                                 messages=messages,
                                 temperature=temperature,
                                 response_format=response_format
                             )
-                        elif node["api_type"] == "anthropic":
+                        elif request_format == "anthropic":
                             response = await node["client"].create_chat_completion(
                                 model=node["model"],
                                 messages=messages,
                                 temperature=temperature,
                                 response_format=response_format
                             )
+                        elif request_format == "openai_response":
+                            kwargs = {
+                                "model": node["model"],
+                                "input": messages,
+                                "temperature": temperature,
+                            }
+                            text_config = _to_responses_text_config(response_format)
+                            if text_config:
+                                kwargs["text"] = text_config
+                            response_obj = await node["client"].responses.create(**kwargs)
+                            response = OpenAIResponsesWrapper(response_obj)
+                        else:
+                            raise ValueError(f"不支持的 request_format: {request_format}")
                         content = response.choices[0].message.content
                         if on_chunk:
                             on_chunk(content)

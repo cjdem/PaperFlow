@@ -22,6 +22,7 @@ from db_models import Paper, User, TranslationLLMProvider, TranslationQueue, Tra
 from deps import get_db, get_current_user, get_current_admin, get_user_from_token
 from audit_service import log_audit_event
 from translation_service import translation_service
+from llm_format import normalize_translation_request_format
 from schemas import (
     TranslateRequest, BatchTranslateRequest, TranslateStatusResponse,
     TranslationQueueStats, TranslationProviderCreate, TranslationProviderResponse
@@ -417,7 +418,12 @@ async def get_translation_providers(
                 "id": p.id,
                 "name": p.name,
                 "engine_type": p.engine_type,
+                "request_format": normalize_translation_request_format(
+                    getattr(p, "request_format", None),
+                    engine_type=getattr(p, "engine_type", None),
+                ),
                 "base_url": p.base_url,
+                "proxy": getattr(p, "proxy", None),
                 "model": p.model,
                 "priority": p.priority,
                 "qps": p.qps,
@@ -448,7 +454,13 @@ async def test_translation_provider(
         raise HTTPException(status_code=404, detail="提供商不存在")
 
     engine_type = (provider.engine_type or "").lower()
+    request_format = normalize_translation_request_format(
+        getattr(provider, "request_format", None),
+        engine_type=getattr(provider, "engine_type", None),
+    )
     requires_api_key = engine_type not in ["google", "ollama"]
+    if request_format in ["openai", "openai_response", "gemini", "anthropic"]:
+        requires_api_key = True
     if requires_api_key and not (provider.api_key and provider.api_key.strip()):
         raise HTTPException(status_code=400, detail="API Key 为空，无法测试")
 
@@ -470,11 +482,19 @@ async def create_translation_provider(
     db: Session = Depends(get_db)
 ):
     """创建翻译 LLM 提供商"""
+    request_format = normalize_translation_request_format(
+        request.request_format,
+        engine_type=request.engine_type,
+    )
+    engine_type = (request.engine_type or request_format).lower()
+
     provider = TranslationLLMProvider(
         name=request.name,
-        engine_type=request.engine_type,
+        engine_type=engine_type,
+        request_format=request_format,
         base_url=request.base_url,
         api_key=request.api_key,
+        proxy=request.proxy,
         model=request.model,
         priority=request.priority,
         qps=request.qps,
@@ -505,11 +525,19 @@ async def update_translation_provider(
     if not provider:
         raise HTTPException(status_code=404, detail="提供商不存在")
     
+    request_format = normalize_translation_request_format(
+        request.request_format if request.request_format is not None else getattr(provider, "request_format", None),
+        engine_type=request.engine_type if request.engine_type is not None else provider.engine_type,
+    )
+    engine_type = (request.engine_type or request_format).lower()
+
     provider.name = request.name
-    provider.engine_type = request.engine_type
+    provider.engine_type = engine_type
+    provider.request_format = request_format
     provider.base_url = request.base_url
     if request.api_key:  # 只有提供了新 key 才更新
         provider.api_key = request.api_key
+    provider.proxy = request.proxy
     provider.model = request.model
     provider.priority = request.priority
     provider.qps = request.qps

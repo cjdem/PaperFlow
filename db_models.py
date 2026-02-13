@@ -80,7 +80,8 @@ class LLMProvider(Base):
     api_key = Column(Text, nullable=False)
     proxy = Column(String(500), nullable=True)
     pool_type = Column(String(20), nullable=False)
-    api_type = Column(String(20), default="openai")  # openai 或 gemini
+    api_type = Column(String(20), default="openai")  # 兼容旧字段（openai/gemini/anthropic）
+    request_format = Column(String(30), default="openai")  # openai/openai_response/gemini/anthropic
     is_primary = Column(Boolean, default=False)
     priority = Column(Integer, default=100)
     weight = Column(Integer, default=10)  # 权重，用于负载均衡
@@ -181,8 +182,10 @@ class TranslationLLMProvider(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)              # 提供商名称
     engine_type = Column(String(50), nullable=False)        # 引擎类型: openai/deepseek/google/deepl/ollama/gemini/azure
+    request_format = Column(String(30), default="openai")   # openai/openai_response/gemini/anthropic
     base_url = Column(String(500), nullable=True)           # API 基础 URL
     api_key = Column(Text, nullable=True)                   # API 密钥（加密存储）
+    proxy = Column(String(500), nullable=True)              # 可选代理地址
     model = Column(String(100), nullable=True)              # 模型名称
     priority = Column(Integer, default=100)                 # 优先级（数字越小优先级越高）
     qps = Column(Integer, default=4)                        # 每秒请求数限制
@@ -273,5 +276,8 @@ def _add_column_if_missing(table: str, column: str, column_type: str):
 
 # 兼容旧数据库：为 llm_providers 增加 proxy 列（若缺失）
 _add_column_if_missing("llm_providers", "proxy", "VARCHAR(500)")
+_add_column_if_missing("llm_providers", "request_format", "VARCHAR(30)")
+_add_column_if_missing("translation_llm_providers", "request_format", "VARCHAR(30)")
+_add_column_if_missing("translation_llm_providers", "proxy", "VARCHAR(500)")
 
 Session = sessionmaker(bind=engine)
