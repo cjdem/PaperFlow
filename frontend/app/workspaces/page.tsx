@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     logout,
@@ -21,6 +21,31 @@ export default function WorkspacesPage() {
     const [newWorkspaceName, setNewWorkspaceName] = useState('');
     const [newWorkspaceDesc, setNewWorkspaceDesc] = useState('');
     const [creating, setCreating] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const sidebarStorageKey = 'paperflow.sidebar.collapsed';
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(sidebarStorageKey);
+            if (saved !== null) {
+                setSidebarCollapsed(saved === '1');
+            }
+        } catch {
+            // ignore localStorage read errors
+        }
+    }, []);
+
+    const handleToggleSidebar = () => {
+        setSidebarCollapsed(prev => {
+            const next = !prev;
+            try {
+                localStorage.setItem(sidebarStorageKey, next ? '1' : '0');
+            } catch {
+                // ignore localStorage write errors
+            }
+            return next;
+        });
+    };
 
     // 加载数据
     const loadData = useCallback(async () => {
@@ -114,39 +139,81 @@ export default function WorkspacesPage() {
     return (
         <div className="min-h-screen bg-slate-900 flex">
             {/* 侧边栏 */}
-            <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col h-screen sticky top-0">
-                <div className="p-4 border-b border-slate-700">
-                    <h1 className="text-xl font-bold text-white">🧬 PaperFlow</h1>
-                    <p className="text-sm text-gray-400 mt-1">👤 {user?.username}</p>
+            <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} bg-slate-800 border-r border-slate-700 flex flex-col h-screen sticky top-0 transition-all duration-300 overflow-hidden`}>
+                <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} border-b border-slate-700`}>
+                    {sidebarCollapsed ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <h1 className="text-xl font-bold text-white">🧬</h1>
+                            <button
+                                onClick={handleToggleSidebar}
+                                className="px-2 py-1 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition"
+                                title="展开侧边栏"
+                            >
+                                <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                    <h1 className="text-xl font-bold text-white">🧬</h1>
+                                    <p className="text-sm text-gray-400 mt-1 truncate">👤 {user?.username}</p>
+                                </div>
+                                <button
+                                    onClick={handleToggleSidebar}
+                                    className="px-2 py-1 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition"
+                                    title="收起侧边栏"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <h1 className="text-xl font-bold text-white mt-2">PaperFlow</h1>
+                        </>
+                    )}
                 </div>
 
                 {/* 导航 */}
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     <button
                         onClick={() => router.push('/papers')}
-                        className="w-full text-left px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700"
+                        className={`w-full px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700 flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2 text-left'}`}
+                        title="我的论文"
                     >
-                        📚 我的论文
+                        <span className="text-lg">📚</span>
+                        {!sidebarCollapsed && <span>我的论文</span>}
                     </button>
                     <button
-                        className="w-full text-left px-3 py-2 rounded-lg transition bg-purple-600 text-white"
+                        className={`w-full px-3 py-2 rounded-lg transition bg-purple-600 text-white flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2 text-left'}`}
+                        title="团队空间"
                     >
-                        👥 团队空间
+                        <span className="text-lg">👥</span>
+                        {!sidebarCollapsed && <span>团队空间</span>}
                     </button>
                     {user?.role === 'admin' && (
                         <button
                             onClick={() => router.push('/admin')}
-                            className="w-full text-left px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700"
+                            className={`w-full px-3 py-2 rounded-lg transition text-gray-300 hover:bg-slate-700 flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2 text-left'}`}
+                            title="系统管理"
                         >
-                            ⚙️ 系统管理
+                            <span className="text-lg">⚙️</span>
+                            {!sidebarCollapsed && <span>系统管理</span>}
                         </button>
                     )}
                 </nav>
 
                 {/* 退出 */}
                 <div className="p-4 border-t border-slate-700">
-                    <button onClick={handleLogout} className="w-full py-2 text-gray-400 hover:text-white transition">
-                        退出登录
+                    <button
+                        onClick={handleLogout}
+                        className={`w-full py-2 text-gray-400 hover:text-white transition flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-2'}`}
+                        title="退出登录"
+                    >
+                        <span>🚪</span>
+                        {!sidebarCollapsed && <span>退出登录</span>}
                     </button>
                 </div>
             </aside>

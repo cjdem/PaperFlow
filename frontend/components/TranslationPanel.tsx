@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient, apiBaseUrl } from '@/lib/apiClient';
 import DownloadButtons from './DownloadButtons';
 
@@ -8,6 +8,7 @@ interface TranslationPanelProps {
   paperId: number;
   paperTitle?: string;  // 论文标题，用于生成下载文件名
   hasFile: boolean;
+  embedded?: boolean;
   onTranslationComplete?: () => void;
 }
 
@@ -32,6 +33,7 @@ export default function TranslationPanel({
   paperId,
   paperTitle,
   hasFile,
+  embedded = false,
   onTranslationComplete
 }: TranslationPanelProps) {
   const [status, setStatus] = useState<TranslationStatus | null>(null);
@@ -41,29 +43,29 @@ export default function TranslationPanel({
   const [error, setError] = useState<string | null>(null);
 
   // 获取翻译状态
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const data = await apiClient.get<TranslationStatus>(`/api/translate/papers/${paperId}/status`);
       setStatus(data);
     } catch (err) {
       console.error('获取翻译状态失败:', err);
     }
-  };
+  }, [paperId]);
 
   // 获取翻译提供商列表
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
       const data = await apiClient.get<{ providers: Provider[] }>('/api/translate/providers');
       setProviders(data.providers.filter((p: Provider) => p.enabled));
     } catch (err) {
       console.error('获取提供商列表失败:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStatus();
     fetchProviders();
-  }, [paperId]);
+  }, [fetchProviders, fetchStatus]);
 
   // 监听翻译进度（SSE）
   useEffect(() => {
@@ -95,7 +97,7 @@ export default function TranslationPanel({
         eventSource.close();
       };
     }
-  }, [status?.status, paperId]);
+  }, [status?.status, paperId, fetchStatus, onTranslationComplete]);
 
   // 开始翻译
   const startTranslation = async () => {
@@ -147,16 +149,20 @@ export default function TranslationPanel({
   };
 
   if (!hasFile) {
-    return (
-      <div className="fluent-card p-5">
+    const noFileContent = (
+      <>
         <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-2">📄 论文翻译</h3>
         <p className="text-[var(--fluent-foreground-secondary)] text-sm">此论文没有关联的 PDF 文件，无法翻译</p>
-      </div>
+      </>
     );
+    if (embedded) {
+      return noFileContent;
+    }
+    return <div className="fluent-card p-5">{noFileContent}</div>;
   }
 
-  return (
-    <div className="fluent-card p-5">
+  const content = (
+    <>
       <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-4">📄 论文翻译</h3>
       
       {/* 状态显示 */}
@@ -249,6 +255,11 @@ export default function TranslationPanel({
           论文已加入翻译队列，请等待处理...
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (embedded) {
+    return content;
+  }
+  return <div className="fluent-card p-5">{content}</div>;
 }

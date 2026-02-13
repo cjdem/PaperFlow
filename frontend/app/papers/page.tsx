@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     logout, getGroups, createGroup, deletePaper,
@@ -51,6 +51,31 @@ export default function PapersPage() {
     const [batchSelectedGroups, setBatchSelectedGroups] = useState<Set<string>>(new Set());
     const [batchLoading, setBatchLoading] = useState(false);
     const [reanalyzingPaperId, setReanalyzingPaperId] = useState<number | null>(null);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const sidebarStorageKey = 'paperflow.sidebar.collapsed';
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(sidebarStorageKey);
+            if (saved !== null) {
+                setSidebarCollapsed(saved === '1');
+            }
+        } catch {
+            // ignore localStorage read errors
+        }
+    }, []);
+
+    const handleToggleSidebar = () => {
+        setSidebarCollapsed(prev => {
+            const next = !prev;
+            try {
+                localStorage.setItem(sidebarStorageKey, next ? '1' : '0');
+            } catch {
+                // ignore localStorage write errors
+            }
+            return next;
+        });
+    };
 
     const loadFilterOptions = useCallback(async () => {
         if (filterOptions) return;
@@ -361,18 +386,46 @@ export default function PapersPage() {
     return (
         <div className="min-h-screen fluent-background flex">
             {/* Fluent 侧边栏 */}
-            <aside className="w-72 fluent-sidebar flex flex-col h-screen sticky top-0">
-                <div className="p-5 border-b border-[var(--fluent-border)]">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                            <span className="text-xl">🧬</span>
+            <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} fluent-sidebar flex flex-col h-screen sticky top-0 transition-all duration-300 overflow-hidden`}>
+                <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} border-b border-[var(--fluent-border)]`}>
+                    {sidebarCollapsed ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                <span className="text-xl">🧬</span>
+                            </div>
+                            <button
+                                onClick={handleToggleSidebar}
+                                className="fluent-button fluent-button-subtle p-1.5"
+                                title="展开侧边栏"
+                            >
+                                <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
                         </div>
-                        <div>
-                            <h1 className="text-lg font-bold text-[var(--fluent-foreground)]">PaperFlow</h1>
-                            <p className="text-xs text-[var(--fluent-foreground-secondary)]">👤 {user?.username}</p>
+                    ) : (
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0">
+                                    <span className="text-xl">🧬</span>
+                                </div>
+                                <div className="min-w-0">
+                                    <h1 className="text-lg font-bold text-[var(--fluent-foreground)]">PaperFlow</h1>
+                                    <p className="text-xs text-[var(--fluent-foreground-secondary)] truncate">👤 {user?.username}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleToggleSidebar}
+                                className="fluent-button fluent-button-subtle p-2 flex-shrink-0"
+                                title="收起侧边栏"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
                         </div>
-                    </div>
-                    {user?.role === 'admin' && (
+                    )}
+                    {user?.role === 'admin' && !sidebarCollapsed && (
                         <button
                             onClick={() => router.push('/admin')}
                             className="mt-3 w-full px-3 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 text-xs rounded-lg hover:from-purple-500/30 hover:to-blue-500/30 transition-all border border-purple-500/20 font-medium"
@@ -385,63 +438,72 @@ export default function PapersPage() {
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                     <button
                         onClick={() => setCurrentView('all')}
-                        className={`fluent-nav-item w-full ${currentView === 'all' ? 'active' : ''}`}
+                        className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''} ${currentView === 'all' ? 'active' : ''}`}
+                        title="所有论文"
                     >
                         <span className="text-lg">📚</span>
-                        <span>所有论文</span>
+                        {!sidebarCollapsed && <span>所有论文</span>}
                     </button>
                     <button
                         onClick={() => setCurrentView('ungrouped')}
-                        className={`fluent-nav-item w-full ${currentView === 'ungrouped' ? 'active' : ''}`}
+                        className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''} ${currentView === 'ungrouped' ? 'active' : ''}`}
+                        title="未分类"
                     >
                         <span className="text-lg">📂</span>
-                        <span>未分类</span>
+                        {!sidebarCollapsed && <span>未分类</span>}
                     </button>
                     <button
                         onClick={() => router.push('/workspaces')}
-                        className="fluent-nav-item w-full"
+                        className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                        title="团队空间"
                     >
                         <span className="text-lg">👥</span>
-                        <span>团队空间</span>
+                        {!sidebarCollapsed && <span>团队空间</span>}
                     </button>
 
                     <div className="pt-4 mt-4 border-t border-[var(--fluent-divider)]">
-                        <p className="text-xs text-[var(--fluent-foreground-secondary)] mb-3 px-2 font-semibold uppercase tracking-wider">分组</p>
+                        {!sidebarCollapsed && (
+                            <p className="text-xs text-[var(--fluent-foreground-secondary)] mb-3 px-2 font-semibold uppercase tracking-wider">分组</p>
+                        )}
                         {groups.map(g => (
                             <button
                                 key={g.id}
                                 onClick={() => setCurrentView(g.name)}
-                                className={`fluent-nav-item w-full ${currentView === g.name ? 'active' : ''}`}
+                                className={`fluent-nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''} ${currentView === g.name ? 'active' : ''}`}
+                                title={g.name}
                             >
                                 <span className="text-lg">🏷️</span>
-                                <span>{g.name}</span>
+                                {!sidebarCollapsed && <span>{g.name}</span>}
                             </button>
                         ))}
                     </div>
 
-                    <div className="pt-4 mt-2">
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newGroupName}
-                                onChange={(e) => setNewGroupName(e.target.value)}
-                                placeholder="新分组名"
-                                className="fluent-input flex-1 text-sm py-2"
-                            />
-                            <button
-                                onClick={handleCreateGroup}
-                                className="fluent-button fluent-button-accent px-3 py-2 text-sm"
-                            >
-                                +
-                            </button>
+                    {!sidebarCollapsed && (
+                        <div className="pt-4 mt-2">
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newGroupName}
+                                    onChange={(e) => setNewGroupName(e.target.value)}
+                                    placeholder="新分组名"
+                                    className="fluent-input flex-1 text-sm py-2"
+                                />
+                                <button
+                                    onClick={handleCreateGroup}
+                                    className="fluent-button fluent-button-accent px-3 py-2 text-sm"
+                                >
+                                    +
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </nav>
 
                 <div className="p-4 border-t border-[var(--fluent-border)]">
                     <label
-                        className={`fluent-button w-full py-3 justify-center cursor-pointer ${uploading ? 'bg-gray-600 cursor-wait' : 'fluent-button-accent'}`}
+                        className={`fluent-button w-full justify-center cursor-pointer ${sidebarCollapsed ? 'px-2 py-2' : 'py-3'} ${uploading ? 'bg-gray-600 cursor-wait' : 'fluent-button-accent'}`}
                         aria-busy={uploading}
+                        title="上传 PDF"
                     >
                         {uploading ? (
                             <span className="flex items-center gap-2" role="status" aria-live="polite">
@@ -449,15 +511,15 @@ export default function PapersPage() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
-                                处理中...
+                                {!sidebarCollapsed && '处理中...'}
                             </span>
                         ) : (
-                            <span>📤 上传 PDF</span>
+                            <span>{sidebarCollapsed ? '📤' : '📤 上传 PDF'}</span>
                         )}
                         <input type="file" accept=".pdf" multiple onChange={handleUpload} className="hidden" disabled={uploading} />
                     </label>
 
-                    {uploadProgress && (
+                    {!sidebarCollapsed && uploadProgress && (
                         <div className="mt-3 p-4 fluent-card space-y-3">
                             {uploadProgress.totalFiles && uploadProgress.totalFiles > 1 && (
                                 <div>
@@ -510,7 +572,7 @@ export default function PapersPage() {
                         </div>
                     )}
 
-                    {uploadLogs.length > 0 && (
+                    {!sidebarCollapsed && uploadLogs.length > 0 && (
                         <div className="mt-3 fluent-card max-h-48 overflow-hidden">
                             <div className="p-3 flex justify-between items-center border-b border-[var(--fluent-divider)] sticky top-0 bg-inherit">
                                 <span className="text-xs text-[var(--fluent-foreground-secondary)] font-medium">📋 处理日志</span>
@@ -539,9 +601,9 @@ export default function PapersPage() {
                 </div>
 
                 <div className="p-4 border-t border-[var(--fluent-border)]">
-                    <button onClick={handleLogout} className="fluent-nav-item w-full justify-center">
+                    <button onClick={handleLogout} className={`fluent-nav-item w-full justify-center ${sidebarCollapsed ? 'px-2' : ''}`} title="退出登录">
                         <span>🚪</span>
-                        <span>退出登录</span>
+                        {!sidebarCollapsed && <span>退出登录</span>}
                     </button>
                 </div>
             </aside>
@@ -775,7 +837,7 @@ export default function PapersPage() {
 
                                 {/* 展开详情 */}
                                 {expandedPaper === paper.id && !selectionMode && (
-                                    <div className="border-t border-[var(--fluent-divider)] bg-[var(--fluent-surface-secondary)] fluent-fade-in">
+                                    <div className="border-t border-[var(--fluent-divider)] fluent-fade-in">
                                         <div className="p-4 border-b border-[var(--fluent-divider)]">
                                             <div className="fluent-tabs">
                                                 {(['analysis', 'abstract_cn', 'abstract_en', 'translate'] as const).map(tab => (
@@ -793,29 +855,32 @@ export default function PapersPage() {
                                             </div>
                                         </div>
                                         <div className="p-5">
-                                            {detailTab === 'analysis' && (
-                                                <div className="prose prose-invert max-w-none">
-                                                    <MarkdownRenderer content={paper.detailed_analysis || paper.analysis || '暂无分析内容'} />
-                                                </div>
-                                            )}
-                                            {detailTab === 'abstract_cn' && (
-                                                <div className="prose prose-invert max-w-none">
-                                                    <p className="text-[var(--fluent-foreground)] leading-relaxed">{paper.abstract || paper.abstract_cn || '暂无中文摘要'}</p>
-                                                </div>
-                                            )}
-                                            {detailTab === 'abstract_en' && (
-                                                <div className="prose prose-invert max-w-none">
-                                                    <p className="text-[var(--fluent-foreground)] leading-relaxed">{paper.abstract_en || '暂无英文摘要'}</p>
-                                                </div>
-                                            )}
-                                            {detailTab === 'translate' && (
+                                            <div className="rounded-xl border border-[var(--fluent-divider)] bg-[var(--fluent-surface)] p-5">
+                                                {detailTab === 'analysis' && (
+                                                    <div className="prose prose-invert max-w-none">
+                                                        <MarkdownRenderer content={paper.detailed_analysis || paper.analysis || '暂无分析内容'} />
+                                                    </div>
+                                                )}
+                                                {detailTab === 'abstract_cn' && (
+                                                    <div className="prose prose-invert max-w-none">
+                                                        <p className="text-[var(--fluent-foreground)] leading-relaxed">{paper.abstract || paper.abstract_cn || '暂无中文摘要'}</p>
+                                                    </div>
+                                                )}
+                                                {detailTab === 'abstract_en' && (
+                                                    <div className="prose prose-invert max-w-none">
+                                                        <p className="text-[var(--fluent-foreground)] leading-relaxed">{paper.abstract_en || '暂无英文摘要'}</p>
+                                                    </div>
+                                                )}
+                                                {detailTab === 'translate' && (
                                                     <TranslationPanel
                                                         paperId={paper.id}
                                                         paperTitle={paper.title}
                                                         hasFile={paper.has_file ?? !!paper.file_path}
+                                                        embedded
                                                         onTranslationComplete={loadData}
                                                     />
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

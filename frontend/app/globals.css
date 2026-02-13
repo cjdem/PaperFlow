@@ -2,6 +2,11 @@
 @import "tailwindcss";
 @import "../styles/theme.css";
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--fluent-background);
   color: var(--fluent-foreground);
