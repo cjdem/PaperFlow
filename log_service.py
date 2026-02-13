@@ -140,7 +140,7 @@ class LLMLogger:
     
     def log_retry(self, attempt: int, max_retries: int, new_provider: str, error: str):
         """记录重试"""
-        self.logger.warning(f"🔄 [重试 {attempt}/{max_retries}] 切换到: {new_provider}")
+        self.logger.warning(f"🔄 [重试 {attempt}/{max_retries}] 通道: {new_provider}")
         self.logger.debug(f"   失败原因: {error}")
     
     def log_failure(self, provider_id: str, error: str):

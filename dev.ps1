@@ -131,6 +131,7 @@ if ($ApiUrl.Trim()) {
 if ($FrontendPort -ne 3000) {
   $frontendEnv += "`$env:PORT = `"$FrontendPort`""
 }
+$frontendEnv += "`$env:PAPERFLOW_BACKEND_URL = `"http://$BackendHost`:$BackendPort`""
 
 $frontendCmdParts = @(
   "Set-Location `"$frontendDir`""

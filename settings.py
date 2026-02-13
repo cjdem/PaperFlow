@@ -9,7 +9,9 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from repo root to avoid CWD-dependent behavior.
+_ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(dotenv_path=_ENV_PATH)
 
 
 def _get_streamlit_secret(key: str) -> Optional[str]:

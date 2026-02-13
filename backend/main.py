@@ -3,6 +3,7 @@ PaperFlow Pro - FastAPI 后端入口
 """
 import os
 import sys
+import logging
 
 # 添加父目录到路径，以便导入共享模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,6 +19,7 @@ app = FastAPI(
     description="论文管理系统 API",
     version="2.0.0"
 )
+logger = logging.getLogger("backend")
 
 # ================= CORS 配置 =================
 app.add_middleware(
@@ -56,6 +58,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("未处理的异常", exc_info=exc)
     return JSONResponse(
         status_code=500,
         content={"detail": "服务器内部错误", "code": "internal_error"}

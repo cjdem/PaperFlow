@@ -113,6 +113,7 @@ export default function AdminPage() {
     const [formData, setFormData] = useState(createEmptyProvider('metadata'));
     const [retryCount, setRetryCount] = useState('3');
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [testingProviderId, setTestingProviderId] = useState<number | null>(null);
 
     const loadRetryConfig = useCallback(async () => {
         const data = await apiClient.get<{ key: string; value: string | null }>('/api/admin/config/llm_max_retries');
@@ -258,6 +259,29 @@ export default function AdminPage() {
             await apiClient.post(`/api/admin/llm-providers/${id}/set-primary`);
         } catch {
             setProviders(previousProviders);
+        }
+    };
+
+    const testProvider = async (p: LLMProvider) => {
+        setTestingProviderId(p.id);
+        try {
+            const res = await apiClient.post<{
+                success: boolean;
+                message: string;
+                latency_ms?: number;
+                model?: string;
+                api_type?: string;
+                sample?: string;
+            }>(`/api/admin/llm-providers/${p.id}/test`);
+
+            const latencyText = res.latency_ms !== undefined ? `（${res.latency_ms}ms）` : '';
+            const modelText = res.model ? `模型: ${res.model}` : '';
+            alert(`✅ ${res.message}${latencyText}${modelText ? `\n${modelText}` : ''}`);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : '测试失败';
+            alert(`❌ ${msg}`);
+        } finally {
+            setTestingProviderId(null);
         }
     };
 
@@ -433,6 +457,15 @@ export default function AdminPage() {
                 <div className="flex flex-col gap-2">
                     <button onClick={() => handleEdit(p)} className="fluent-button fluent-button-subtle px-3 py-1.5 text-sm font-medium">
                         ✏️ 编辑
+                    </button>
+                    <button
+                        onClick={() => testProvider(p)}
+                        disabled={testingProviderId === p.id}
+                        className={`fluent-button px-3 py-1.5 text-sm font-medium ${
+                            testingProviderId === p.id ? 'bg-purple-400/30 text-purple-200 cursor-wait' : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                        }`}
+                    >
+                        {testingProviderId === p.id ? '🔌 测试中...' : '🔌 测试连接'}
                     </button>
                     <button
                         onClick={() => toggleProvider(p.id, p.enabled)}

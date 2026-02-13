@@ -17,19 +17,40 @@ def normalize_title(title):
     if not title: return ""
     return re.sub(r'[^a-zA-Z0-9]', '', title).lower()
 
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+def sanitize_text_for_llm(text: str) -> str:
+    """移除控制字符，降低上游接口误拦截概率"""
+    if not text:
+        return ""
+    return _CONTROL_CHARS_RE.sub("", text)
+
 def extract_pdf_content(file_path):
     logger.debug(f"正在读取 PDF: {file_path}")
     try:
-        doc = fitz.open(file_path)
-        full_text = ""
-        for page in doc:
-            full_text += page.get_text()
+        # 元数据提取只需要前几页（标题/作者/摘要通常都在首页），避免输入过长或包含无关内容
+        head_pages = 2
+        head_max_chars = 8000
+
+        full_text_parts = []
+        head_text_parts = []
+
+        with fitz.open(file_path) as doc:
+            for page_index, page in enumerate(doc):
+                page_text = page.get_text()
+                full_text_parts.append(page_text)
+                if page_index < head_pages and len("".join(head_text_parts)) < head_max_chars:
+                    head_text_parts.append(page_text)
+
+        full_text = sanitize_text_for_llm("".join(full_text_parts))
+        head_text = sanitize_text_for_llm("".join(head_text_parts))[:head_max_chars]
+        if not head_text and full_text:
+            head_text = full_text[:head_max_chars]
         
         if len(full_text) < 100:
             logger.warning("提取内容过少，可能是扫描件")
             return None, None
-            
-        head_text = full_text[:15000]
+
         return head_text, full_text
     except Exception as e:
         logger.error(f"PDF 读取失败: {e}")
@@ -44,6 +65,7 @@ async def task_extract_metadata(text):
     def validate_json(content):
         return "title" in content and len(content) > 20
 
+    safe_text = sanitize_text_for_llm(text)
     prompt = f"""
     你是一个专业的学术文献解析助手。请从论文片段中提取元数据。
     
@@ -61,7 +83,9 @@ async def task_extract_metadata(text):
     - abstract (String): 中文摘要翻译
 
     【论文片段】：
-    {text} ... 
+    {safe_text} ... 
+
+    【输出要求】：只输出 JSON，不要包含任何解释、Markdown、代码块标记。
     """
     
     try:
@@ -82,6 +106,65 @@ async def task_extract_metadata(text):
         return parsed_json
 
     except Exception as e:
+        # 部分 OpenAI 兼容中转/网关会对 JSON mode 或大段文本触发拦截（403 blocked）。
+        # 这里做一次降级：缩短输入 + 不使用 response_format，再尝试一次。
+        try:
+            from openai import APIStatusError
+        except Exception:
+            APIStatusError = ()  # type: ignore
+
+        should_fallback = False
+        if APIStatusError and isinstance(e, APIStatusError):
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            body = getattr(e, "body", None)
+            msg = str(e) or ""
+            body_text = ""
+            try:
+                if body is not None:
+                    body_text = json.dumps(body, ensure_ascii=False)
+            except Exception:
+                body_text = str(body) if body is not None else ""
+
+            combined = (msg + " " + body_text).lower()
+            if status_code in (400, 403) and ("response_format" in combined or "json_object" in combined or "blocked" in combined):
+                should_fallback = True
+
+        if should_fallback:
+            logger.warning("元数据提取被上游拦截/不兼容，尝试降级请求（缩短文本 + 关闭 JSON mode）")
+            fallback_text = safe_text[:4000]
+            fallback_prompt = f"""
+            你是一个专业的学术文献解析助手。请从论文片段中提取元数据。
+
+            【输出 JSON 字段】：
+            - title (String)
+            - title_cn (String)
+            - authors (String)  # 多个作者用英文逗号拼接
+            - journal (String)
+            - year (Integer)
+            - abstract_en (String)
+            - abstract (String)
+
+            【论文片段】：
+            {fallback_text}
+
+            【输出要求】：只输出 JSON，不要包含任何解释、Markdown、代码块标记。
+            """
+            try:
+                response = await llm_manager.chat(
+                    pool_name="metadata",
+                    messages=[{"role": "user", "content": fallback_prompt}],
+                    temperature=0.1,
+                    validator=validate_json
+                )
+                content = response.choices[0].message.content
+                parsed_json = json.loads(repair_json(content))
+                if isinstance(parsed_json.get('authors'), list):
+                    parsed_json['authors'] = ", ".join(parsed_json['authors'])
+                logger.info(f"元数据提取成功(降级): {parsed_json.get('title_cn')}")
+                return parsed_json
+            except Exception as e2:
+                logger.error(f"Metadata 降级请求失败: {e2}")
+
         logger.error(f"Metadata 任务失败: {e}")
         raise e
 
@@ -388,12 +471,28 @@ async def reanalyze_paper(paper_id: int, owner_id: int = None):
         
         if not full_text:
             raise ValueError("PDF 内容提取失败")
+
+        # 尝试重新提取元数据（可选，失败不影响继续生成分析）
+        metadata = None
+        try:
+            if head_text:
+                metadata = await task_extract_metadata(head_text)
+        except Exception as meta_error:
+            logger.warning(f"重新分析：元数据提取失败，跳过更新元数据: {meta_error}")
         
         # 重新进行深度分析
         analysis = await task_analyze_paper(full_text)
         
         # 更新数据库
         paper.detailed_analysis = analysis
+        if metadata and metadata.get("title"):
+            paper.title = metadata.get("title")
+            paper.title_cn = metadata.get("title_cn")
+            paper.journal = metadata.get("journal")
+            paper.year = str(metadata.get("year")) if metadata.get("year") is not None else paper.year
+            paper.authors = metadata.get("authors")
+            paper.abstract_en = metadata.get("abstract_en")
+            paper.abstract = metadata.get("abstract")
         session.commit()
         
         logger.info(f"论文重新分析完成: {paper.title}")

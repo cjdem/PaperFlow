@@ -10,7 +10,7 @@ import random
 import asyncio
 import httpx
 import time
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIStatusError
 from llm_service import get_enabled_providers, import_from_json, mark_provider_success, mark_provider_failure
 from db_service import get_config
 from log_service import llm_logger, get_logger
@@ -299,6 +299,7 @@ class LLMManager:
         # 按优先级顺序遍历每个 Provider
         for node in target_pool:
             provider_id = node['id']
+            hard_fail = False
             
             # 对当前 Provider 进行最多 max_retries 次尝试
             for attempt in range(max_retries):
@@ -330,7 +331,21 @@ class LLMManager:
                         }
                         if response_format:
                             kwargs["response_format"] = response_format
-                        response = await node["client"].chat.completions.create(**kwargs)
+                        try:
+                            response = await node["client"].chat.completions.create(**kwargs)
+                        except APIStatusError as api_error:
+                            # 降级兼容：部分中转/网关不支持 response_format(JSON mode)
+                            status_code = getattr(getattr(api_error, "response", None), "status_code", None)
+                            combined = (str(api_error) + " " + str(getattr(api_error, "body", ""))).lower()
+                            if response_format and status_code in (400, 403) and (
+                                "response_format" in combined or "json_object" in combined
+                            ):
+                                fallback_kwargs = dict(kwargs)
+                                fallback_kwargs.pop("response_format", None)
+                                logger.warning(f"⚠️ {provider_id} 不支持 response_format，已降级重试")
+                                response = await node["client"].chat.completions.create(**fallback_kwargs)
+                            else:
+                                raise
 
                     # 质检环节
                     if validator:
@@ -348,11 +363,23 @@ class LLMManager:
                         mark_provider_failure(node["provider_db_id"], str(e))
                     llm_logger.log_failure(provider_id, str(e))
                     last_error = e
+
+                    # 400/401/403 往往是请求或权限问题，继续重试同一通道无意义，直接切换下一个 Provider
+                    if isinstance(e, APIStatusError):
+                        status_code = getattr(getattr(e, "response", None), "status_code", None)
+                        if status_code in (400, 401, 403):
+                            logger.warning(f"⚠️ Provider {provider_id} 返回 {status_code}，不再重试该通道")
+                            hard_fail = True
+                            break
+
                     # 继续当前 Provider 的下一次重试
                     continue
             
             # 当前 Provider 已用尽所有重试次数，切换到下一个
-            logger.warning(f"⚠️ Provider {provider_id} 已用尽 {max_retries} 次重试，切换到下一个")
+            if hard_fail:
+                logger.warning(f"⚠️ Provider {provider_id} 不可重试错误，切换到下一个")
+            else:
+                logger.warning(f"⚠️ Provider {provider_id} 已用尽 {max_retries} 次重试，切换到下一个")
 
         # 所有 Provider 均已尝试完毕
         llm_logger.log_exhausted()

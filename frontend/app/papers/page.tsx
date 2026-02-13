@@ -168,6 +168,11 @@ export default function PapersPage() {
     };
 
     const handleDownload = async (paper: Paper) => {
+        const hasFile = paper.has_file ?? !!paper.file_path;
+        if (!hasFile) {
+            alert('文件不存在，无法下载');
+            return;
+        }
         try {
             const filename = (paper.title || 'paper') + '.pdf';
             const blob = await apiClient.get<Blob>(`/api/papers/${paper.id}/download`, {
@@ -179,11 +184,25 @@ export default function PapersPage() {
         }
     };
 
-    const handlePreview = (paper: Paper) => {
-        previewPaper(paper.id);
+    const handlePreview = async (paper: Paper) => {
+        const hasFile = paper.has_file ?? !!paper.file_path;
+        if (!hasFile) {
+            alert('文件不存在，无法预览');
+            return;
+        }
+        try {
+            await previewPaper(paper.id);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '预览失败');
+        }
     };
 
     const handleReanalyze = async (paper: Paper) => {
+        const hasFile = paper.has_file ?? !!paper.file_path;
+        if (!hasFile) {
+            alert('文件不存在，无法重新分析');
+            return;
+        }
         if (!confirm(`确定要重新分析论文「${paper.title}」吗？这可能需要几分钟时间。`)) return;
         
         setReanalyzingPaperId(paper.id);
@@ -683,8 +702,9 @@ export default function PapersPage() {
                                             <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                                                 <button
                                                     onClick={() => handlePreview(paper)}
-                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm"
-                                                    title="预览"
+                                                    disabled={!(paper.has_file ?? !!paper.file_path)}
+                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title={paper.has_file ?? !!paper.file_path ? '预览' : '文件不存在'}
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -694,8 +714,9 @@ export default function PapersPage() {
                                                 </button>
                                                 <button
                                                     onClick={() => handleDownload(paper)}
-                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm"
-                                                    title="下载"
+                                                    disabled={!(paper.has_file ?? !!paper.file_path)}
+                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title={paper.has_file ?? !!paper.file_path ? '下载' : '文件不存在'}
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -704,9 +725,9 @@ export default function PapersPage() {
                                                 </button>
                                                 <button
                                                     onClick={() => handleReanalyze(paper)}
-                                                    disabled={reanalyzingPaperId === paper.id}
+                                                    disabled={reanalyzingPaperId === paper.id || !(paper.has_file ?? !!paper.file_path)}
                                                     className="fluent-button fluent-button-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title="重新分析"
+                                                    title={paper.has_file ?? !!paper.file_path ? '重新分析' : '文件不存在'}
                                                 >
                                                     {reanalyzingPaperId === paper.id ? (
                                                         <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
@@ -779,12 +800,12 @@ export default function PapersPage() {
                                                 </div>
                                             )}
                                             {detailTab === 'translate' && (
-                                                <TranslationPanel
-                                                    paperId={paper.id}
-                                                    paperTitle={paper.title}
-                                                    hasFile={!!paper.file_path}
-                                                    onTranslationComplete={loadData}
-                                                />
+                                                    <TranslationPanel
+                                                        paperId={paper.id}
+                                                        paperTitle={paper.title}
+                                                        hasFile={paper.has_file ?? !!paper.file_path}
+                                                        onTranslationComplete={loadData}
+                                                    />
                                             )}
                                         </div>
                                     </div>

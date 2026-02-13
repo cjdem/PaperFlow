@@ -2,6 +2,7 @@
 管理员路由 - 系统管理功能
 """
 import logging
+import time
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,15 +12,18 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
-from llm_pool import llm_manager
+from llm_pool import llm_manager, GeminiClientWrapper, AnthropicClientWrapper
 from file_service import file_service
 
 from deps import get_db, get_current_admin
+from llm_service import mark_provider_success, mark_provider_failure
 from schemas import (
     DbStatsResponse, LLMProviderResponse,
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
     SystemConfigRequest, UserResponse, UserQuotaRequest
 )
+from openai import AsyncOpenAI, APIStatusError
+import httpx
 
 router = APIRouter(prefix="/api/admin", tags=["管理"])
 
@@ -40,6 +44,82 @@ def _reload_config_background():
 def trigger_reload_async():
     """触发异步重载（非阻塞）"""
     _executor.submit(_reload_config_background)
+
+
+def _pick_first(value: str) -> str:
+    items = [item.strip() for item in (value or "").split(",") if item.strip()]
+    return items[0] if items else ""
+
+
+async def _test_provider_connectivity(provider: LLMProvider) -> dict:
+    api_key = _pick_first(provider.api_key)
+    model = _pick_first(provider.models)
+    api_type = (provider.api_type or "openai").lower()
+    base_url = (provider.base_url or "").strip()
+    base_url = base_url.rstrip("/") if base_url else None
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API Key 为空，无法测试")
+    if not model:
+        raise HTTPException(status_code=400, detail="模型名称为空，无法测试")
+
+    messages = [{"role": "user", "content": "请回复：OK"}]
+    start_time = time.monotonic()
+
+    try:
+        if api_type == "gemini":
+            client = GeminiClientWrapper(api_key=api_key, base_url=base_url)
+            response = await client.create_chat_completion(
+                model=model,
+                messages=messages,
+                temperature=0
+            )
+        elif api_type == "anthropic":
+            client = AnthropicClientWrapper(api_key=api_key, base_url=base_url)
+            response = await client.create_chat_completion(
+                model=model,
+                messages=messages,
+                temperature=0,
+                max_tokens=32
+            )
+        else:
+            client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=httpx.Timeout(30.0, connect=10.0)
+            )
+            response = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0,
+                max_tokens=16
+            )
+
+        latency_ms = int((time.monotonic() - start_time) * 1000)
+        mark_provider_success(provider.id, latency_ms)
+        content = ""
+        try:
+            if response and response.choices:
+                content = response.choices[0].message.content or ""
+        except Exception:
+            content = ""
+
+        return {
+            "success": True,
+            "message": "联通成功",
+            "latency_ms": latency_ms,
+            "model": model,
+            "api_type": api_type,
+            "sample": content[:200]
+        }
+    except Exception as e:
+        error_text = str(e) or "未知错误"
+        if isinstance(e, APIStatusError):
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            if status_code:
+                error_text = f"HTTP {status_code}: {error_text}"
+        mark_provider_failure(provider.id, error_text)
+        raise HTTPException(status_code=502, detail=f"测试失败: {error_text[:300]}")
 
 
 # ================= 系统概览 =================
@@ -266,6 +346,22 @@ async def toggle_enabled(
     db.commit()
     trigger_reload_async()  # 异步刷新内存配置（非阻塞）
     return {"message": "切换成功", "enabled": provider.enabled}
+
+
+@router.post("/llm-providers/{provider_id}/test")
+async def test_llm_provider(
+    provider_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """测试 LLM 提供商连通性"""
+    provider = db.query(LLMProvider).filter(LLMProvider.id == provider_id).first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="提供商不存在")
+    if provider.pool_type not in ("metadata", "analysis"):
+        raise HTTPException(status_code=400, detail="仅支持元数据/分析池的测试")
+
+    return await _test_provider_connectivity(provider)
 
 
 # ================= 系统配置 =================

@@ -89,7 +89,7 @@ if "%NEED_NPM%"=="1" (
 echo [INFO] Starting servers...
 
 start "PaperFlow Backend" /D "%BACKEND_DIR%" cmd /k ""%VENV_PY%" -m uvicorn main:app --reload --host %BACKEND_HOST% --port %BACKEND_PORT%"
-start "PaperFlow Frontend" /D "%FRONTEND_DIR%" cmd /k "npm run dev -- -p %FRONTEND_PORT%"
+start "PaperFlow Frontend" /D "%FRONTEND_DIR%" cmd /k "set \"PAPERFLOW_BACKEND_URL=http://%BACKEND_HOST%:%BACKEND_PORT%\"&& npm run dev -- -p %FRONTEND_PORT%"
 
 echo [INFO] Backend:  http://%BACKEND_HOST%:%BACKEND_PORT%/docs
 echo [INFO] Frontend: http://localhost:%FRONTEND_PORT%

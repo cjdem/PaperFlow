@@ -5,6 +5,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from typing import Optional, List
+from sqlalchemy.orm import Session
 from urllib.parse import quote
 
 import sys
@@ -13,9 +14,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_models import Paper, User
 from file_service import file_service
 from audit_service import log_audit_event
+from log_service import get_logger
 # 注意：reanalyze_paper 使用延迟导入以避免循环导入
 
-from deps import get_current_user, get_paper_service
+from deps import get_current_user, get_paper_service, get_db
 from backend.services.paper_service import PaperService
 from schemas import (
     PaperResponse, PaperListResponse, UpdatePaperGroupsRequest, GroupInfo,
@@ -24,6 +26,7 @@ from schemas import (
 )
 
 router = APIRouter(prefix="/api/papers", tags=["论文"])
+logger = get_logger("papers")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -39,10 +42,12 @@ def sanitize_filename(filename: str) -> str:
 def paper_to_response(paper: Paper) -> PaperResponse:
     """将 Paper ORM 对象转换为响应模型"""
     # 判断是否有关联文件
-    has_file = bool(paper.file_path) or (
-        paper.md5_hash and paper.owner_id and
-        file_service.file_exists(paper.owner_id, paper.md5_hash)
+    resolved_path = file_service.resolve_paper_file_path(
+        relative_path=paper.file_path,
+        user_id=paper.owner_id,
+        md5_hash=paper.md5_hash
     )
+    has_file = resolved_path is not None
     
     return PaperResponse(
         id=paper.id,
@@ -121,7 +126,8 @@ async def get_paper(
 async def delete_paper(
     paper_id: int,
     current_user: User = Depends(get_current_user),
-    paper_service: PaperService = Depends(get_paper_service)
+    paper_service: PaperService = Depends(get_paper_service),
+    db: Session = Depends(get_db)
 ):
     """删除论文（同时删除物理文件和翻译文件）"""
     paper = paper_service.get_paper(paper_id)
@@ -295,18 +301,24 @@ async def reanalyze_paper_endpoint(
     paper_service.ensure_access(paper, current_user)
     
     # 检查是否有文件
-    has_file = bool(paper.file_path) or (
-        paper.md5_hash and paper.owner_id and
-        file_service.file_exists(paper.owner_id, paper.md5_hash)
+    resolved_path = file_service.resolve_paper_file_path(
+        relative_path=paper.file_path,
+        user_id=paper.owner_id,
+        md5_hash=paper.md5_hash
     )
-    
-    if not has_file:
-        raise HTTPException(status_code=400, detail="论文没有关联的 PDF 文件，无法重新分析")
+
+    if not resolved_path:
+        raise HTTPException(status_code=404, detail="文件不存在或路径不安全，无法重新分析")
     
     try:
-        # 延迟导入以避免循环导入
-        from main import reanalyze_paper
-        
+        # 延迟导入以避免循环导入（从仓库根目录的 main.py 加载）
+        import importlib.util
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        spec = importlib.util.spec_from_file_location("paper_main", os.path.join(root_dir, "main.py"))
+        paper_main = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(paper_main)
+        reanalyze_paper = paper_main.reanalyze_paper
+
         # 执行重新分析（允许管理员分析任何论文）
         owner_id = None if current_user.role == "admin" else current_user.id
         analysis = await reanalyze_paper(paper_id, owner_id)
@@ -327,4 +339,5 @@ async def reanalyze_paper_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.exception("重新分析失败", exc_info=e)
         raise HTTPException(status_code=500, detail=f"重新分析失败: {str(e)}")
