@@ -16,7 +16,6 @@ import { usePolling } from '@/lib/usePolling';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import AdvancedSearch, { SearchParams } from '@/components/AdvancedSearch';
 import TranslationPanel from '@/components/TranslationPanel';
-import DropdownMenu from '@/components/ui/DropdownMenu';
 
 
 export default function PapersPage() {
@@ -634,7 +633,7 @@ export default function PapersPage() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {papers.map((paper, index) => (
+                        {papers.map((paper) => (
                             <div
                                 key={paper.id}
                                 className={`fluent-card overflow-hidden transition-all fluent-stagger-item hover-lift ${
@@ -644,9 +643,9 @@ export default function PapersPage() {
                                 }`}
                             >
                                 <div className="p-5">
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex items-start gap-4">
                                         {selectionMode && (
-                                            <div className="mr-4 flex items-center">
+                                            <div className="mr-1 flex items-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedPapers.has(paper.id)}
@@ -655,112 +654,122 @@ export default function PapersPage() {
                                                 />
                                             </div>
                                         )}
-                                        <div
-                                            className="flex-1 cursor-pointer"
-                                            onClick={() => {
-                                                if (selectionMode) {
-                                                    toggleSelection(paper.id);
-                                                } else {
-                                                    setExpandedPaper(expandedPaper === paper.id ? null : paper.id);
-                                                }
-                                            }}
-                                        >
-                                            <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] leading-tight">{paper.title}</h3>
-                                            {paper.title_cn && <p className="text-[var(--fluent-foreground-secondary)] text-sm mt-1">{paper.title_cn}</p>}
-                                            <div className="flex items-center gap-3 mt-3 text-sm text-[var(--fluent-foreground-secondary)]">
-                                                <span className="fluent-badge">{paper.journal || 'Journal'}</span>
-                                                <span>📅 {paper.year}</span>
-                                                <span className="truncate max-w-[200px]">✍️ {paper.authors?.slice(0, 50)}{paper.authors && paper.authors.length > 50 ? '...' : ''}</span>
-                                            </div>
-                                            {!selectionMode && (
-                                                <div className="flex flex-wrap gap-2 mt-3">
-                                                    {groups.map(g => (
-                                                        <button
-                                                            key={g.id}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleGroupToggle(paper.id, g.name, paper.groups);
-                                                            }}
-                                                            className={`px-2.5 py-1 text-xs rounded-full transition font-medium ${paper.groups.some(pg => pg.name === g.name) ? 'fluent-badge-accent' : 'fluent-badge hover:bg-white/10'}`}
-                                                        >
-                                                            {g.name}
-                                                        </button>
-                                                    ))}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start gap-3">
+                                                <div
+                                                    className="min-w-0 flex-1 cursor-pointer"
+                                                    onClick={() => {
+                                                        if (selectionMode) {
+                                                            toggleSelection(paper.id);
+                                                        } else {
+                                                            setExpandedPaper(expandedPaper === paper.id ? null : paper.id);
+                                                        }
+                                                    }}
+                                                >
+                                                    <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] leading-tight break-words">{paper.title}</h3>
+                                                    {paper.title_cn && <p className="text-[var(--fluent-foreground-secondary)] text-sm mt-1 break-words">{paper.title_cn}</p>}
+                                                    <div className="flex flex-wrap items-center gap-3 mt-3 text-sm text-[var(--fluent-foreground-secondary)]">
+                                                        <span className="fluent-badge">{paper.journal || 'Journal'}</span>
+                                                        <span>📅 {paper.year}</span>
+                                                    </div>
+                                                    <p className="mt-2 text-sm text-[var(--fluent-foreground-secondary)] break-words">
+                                                        ✍️ {paper.authors || '未知作者'}
+                                                    </p>
+                                                    {!selectionMode && (
+                                                        <div className="flex flex-wrap gap-2 mt-3">
+                                                            {groups.map(g => (
+                                                                <button
+                                                                    key={g.id}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleGroupToggle(paper.id, g.name, paper.groups);
+                                                                    }}
+                                                                    className={`px-2.5 py-1 text-xs rounded-full transition font-medium ${paper.groups.some(pg => pg.name === g.name) ? 'fluent-badge-accent' : 'fluent-badge hover:bg-white/10'}`}
+                                                                >
+                                                                    {g.name}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {selectionMode && paper.groups.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                            {paper.groups.map(g => (
+                                                                <span key={g.id} className="fluent-badge-accent px-2 py-0.5 text-xs rounded-full">
+                                                                    {g.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                            {selectionMode && paper.groups.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-2">
-                                                    {paper.groups.map(g => (
-                                                        <span key={g.id} className="fluent-badge-accent px-2 py-0.5 text-xs rounded-full">
-                                                            {g.name}
-                                                        </span>
-                                                    ))}
+                                                {!selectionMode && (
+                                                    <button
+                                                        onClick={() => setExpandedPaper(expandedPaper === paper.id ? null : paper.id)}
+                                                        className={`fluent-button fluent-button-subtle p-2 transition-transform flex-shrink-0 ${expandedPaper === paper.id ? 'rotate-180' : ''}`}
+                                                        title={expandedPaper === paper.id ? '收起' : '展开'}
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {!selectionMode && (
+                                                <div className="mt-4 flex flex-wrap items-center gap-2">
+                                                    <button
+                                                        onClick={() => handlePreview(paper)}
+                                                        disabled={!(paper.has_file ?? !!paper.file_path)}
+                                                        className="fluent-button fluent-button-subtle px-2.5 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title={paper.has_file ?? !!paper.file_path ? '预览' : '文件不存在'}
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                        <span className="ml-1">预览</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDownload(paper)}
+                                                        disabled={!(paper.has_file ?? !!paper.file_path)}
+                                                        className="fluent-button fluent-button-subtle px-2.5 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title={paper.has_file ?? !!paper.file_path ? '下载' : '文件不存在'}
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                        </svg>
+                                                        <span className="ml-1">下载</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleReanalyze(paper)}
+                                                        disabled={reanalyzingPaperId === paper.id || !(paper.has_file ?? !!paper.file_path)}
+                                                        className="fluent-button fluent-button-subtle px-2.5 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title={paper.has_file ?? !!paper.file_path ? '重新分析' : '文件不存在'}
+                                                    >
+                                                        {reanalyzingPaperId === paper.id ? (
+                                                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                            </svg>
+                                                        )}
+                                                        <span className="ml-1">{reanalyzingPaperId === paper.id ? '分析中' : '重新分析'}</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(paper.id)}
+                                                        className="fluent-button px-2.5 py-1.5 text-sm bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20"
+                                                        title="删除"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                        <span className="ml-1">删除</span>
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
-                                        {!selectionMode && (
-                                            <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                                                <button
-                                                    onClick={() => handlePreview(paper)}
-                                                    disabled={!(paper.has_file ?? !!paper.file_path)}
-                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title={paper.has_file ?? !!paper.file_path ? '预览' : '文件不存在'}
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                    <span className="ml-1.5">预览</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDownload(paper)}
-                                                    disabled={!(paper.has_file ?? !!paper.file_path)}
-                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title={paper.has_file ?? !!paper.file_path ? '下载' : '文件不存在'}
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                    </svg>
-                                                    <span className="ml-1.5">下载</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleReanalyze(paper)}
-                                                    disabled={reanalyzingPaperId === paper.id || !(paper.has_file ?? !!paper.file_path)}
-                                                    className="fluent-button fluent-button-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title={paper.has_file ?? !!paper.file_path ? '重新分析' : '文件不存在'}
-                                                >
-                                                    {reanalyzingPaperId === paper.id ? (
-                                                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                        </svg>
-                                                    )}
-                                                    <span className="ml-1.5">{reanalyzingPaperId === paper.id ? '分析中' : '重新分析'}</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(paper.id)}
-                                                    className="fluent-button px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20"
-                                                    title="删除"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => setExpandedPaper(expandedPaper === paper.id ? null : paper.id)}
-                                                    className={`fluent-button fluent-button-subtle p-2 transition-transform ${expandedPaper === paper.id ? 'rotate-180' : ''}`}
-                                                    title={expandedPaper === paper.id ? '收起' : '展开'}
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
 

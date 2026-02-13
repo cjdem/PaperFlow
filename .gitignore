@@ -167,3 +167,8 @@ frontend/.turbo/
 # SQLite runtime files
 *.db-wal
 *.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
