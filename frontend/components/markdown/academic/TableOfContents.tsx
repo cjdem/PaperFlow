@@ -87,21 +87,28 @@ export function TableOfContents({
 
   // 初始化和内容变化时重新生成目录
   useEffect(() => {
-    generateToc();
+    if (!contentRef.current) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      generateToc();
+    });
 
     // 监听内容变化
-    if (contentRef.current) {
-      const observer = new MutationObserver(() => {
+    const observer = new MutationObserver(() => {
+      window.requestAnimationFrame(() => {
         generateToc();
       });
+    });
 
-      observer.observe(contentRef.current, {
-        childList: true,
-        subtree: true,
-      });
+    observer.observe(contentRef.current, {
+      childList: true,
+      subtree: true,
+    });
 
-      return () => observer.disconnect();
-    }
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
   }, [generateToc, contentRef]);
 
   // 点击跳转

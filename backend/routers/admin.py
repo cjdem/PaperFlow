@@ -3,7 +3,6 @@
 """
 import logging
 import time
-import hashlib
 import secrets
 import string
 from typing import Optional
@@ -11,9 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import User, Paper, Group, LLMProvider, SystemConfig, AuditLog
 from backend.core.llm_pool import (
     llm_manager,
@@ -23,10 +19,11 @@ from backend.core.llm_pool import (
 )
 from backend.core.file_service import file_service
 from backend.core.llm_format import normalize_request_format, format_to_legacy_api_type
+from backend.core.utils import make_password_hash
 
-from deps import get_db, get_current_admin
+from backend.deps import get_db, get_current_admin
 from backend.core.llm_service import mark_provider_success, mark_provider_failure
-from schemas import (
+from backend.schemas import (
     DbStatsResponse, LLMProviderResponse,
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
     SystemConfigRequest, UserResponse, UserQuotaRequest,
@@ -61,10 +58,6 @@ def trigger_reload_async():
 def _pick_first(value: str) -> str:
     items = [item.strip() for item in (value or "").split(",") if item.strip()]
     return items[0] if items else ""
-
-
-def _make_password_hash(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
 
 
 def _generate_temp_password(length: int = 12) -> str:
@@ -322,7 +315,7 @@ async def reset_user_password(
     if len(raw_password) < 6:
         raise HTTPException(status_code=400, detail="密码长度至少 6 位")
 
-    user.password_hash = _make_password_hash(raw_password)
+    user.password_hash = make_password_hash(raw_password)
     db.commit()
 
     return AdminResetPasswordResponse(

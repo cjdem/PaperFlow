@@ -1,26 +1,17 @@
 """
 认证路由 - 登录、注册、获取当前用户
 """
-import hashlib
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import User
+from backend.core.utils import make_password_hash
 
-from deps import get_db, create_access_token, get_current_user
-from schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from backend.deps import get_db, create_access_token, get_current_user
+from backend.schemas import RegisterRequest, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
-
-
-def make_password_hash(password: str) -> str:
-    """简单的密码哈希"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
 
 @router.post("/login", response_model=TokenResponse)
 async def login(

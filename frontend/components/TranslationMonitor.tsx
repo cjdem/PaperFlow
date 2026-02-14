@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/apiClient';
 import { usePolling } from '@/lib/usePolling';
 
@@ -157,10 +157,6 @@ export default function TranslationMonitor() {
     intervalMs: 5000,
     deps: [statusFilter]
   });
-
-  useEffect(() => {
-    fetchProviders();
-  }, [fetchProviders]);
 
   // 启动工作线程
   const startWorker = async () => {

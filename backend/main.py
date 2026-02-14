@@ -2,12 +2,7 @@
 PaperFlow Pro - FastAPI 后端入口
 """
 import asyncio
-import os
-import sys
 import logging
-
-# 添加父目录到路径，以便导入共享模块
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse

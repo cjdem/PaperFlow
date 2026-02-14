@@ -7,8 +7,8 @@ import asyncio
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 
-from backend.core.log_service import get_logger
-from backend.core.db_models import Session, Paper, TranslationQueue, TranslationLLMProvider, TranslationLog
+from backend.core.log_service import get_logger, write_translation_log
+from backend.core.db_models import Session, Paper, TranslationQueue
 from backend.core.settings import settings
 
 logger = get_logger("translation_queue")
@@ -44,22 +44,13 @@ class TranslationQueueManager:
         details: Optional[Dict] = None
     ):
         """记录日志到数据库"""
-        session = Session()
-        try:
-            log_entry = TranslationLog(
-                task_id=task_id,
-                paper_id=paper_id,
-                level=level,
-                message=message,
-                details=details,
-                created_at=datetime.now().isoformat()
-            )
-            session.add(log_entry)
-            session.commit()
-        except Exception as e:
-            logger.error(f"写入翻译日志失败: {e}")
-        finally:
-            session.close()
+        write_translation_log(
+            level=level,
+            message=message,
+            task_id=task_id,
+            paper_id=paper_id,
+            details=details,
+        )
 
     def _cleanup_previous_translation_outputs(self, paper: Paper) -> Dict[str, Any]:
         """

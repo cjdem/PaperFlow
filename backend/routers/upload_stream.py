@@ -1,8 +1,6 @@
 """
 上传进度路由 - 使用 SSE 推送处理进度
 """
-import os
-import sys
 import asyncio
 import hashlib
 from datetime import datetime
@@ -11,11 +9,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 import json
-
-# 添加父目录到路径
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, root_dir)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.db_models import Paper, User
 from backend.core.utils import calculate_md5
@@ -27,7 +20,7 @@ from backend.services.paper_pipeline import (
     normalize_title,
 )
 
-from deps import get_db, get_current_user
+from backend.deps import get_db, get_current_user
 
 router = APIRouter(prefix="/api/upload-stream", tags=["上传流"])
 

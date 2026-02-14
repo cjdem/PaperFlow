@@ -19,7 +19,7 @@ export const CodeRenderer: IRenderer = {
     const { code: codeOptions } = options;
     const codeBlocks = element.querySelectorAll('pre > code');
 
-    codeBlocks.forEach((block, index) => {
+    codeBlocks.forEach((block) => {
       const codeElement = block as HTMLElement;
       const preElement = codeElement.parentElement;
 

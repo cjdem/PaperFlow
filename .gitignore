@@ -63,15 +63,6 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -101,8 +92,6 @@ pnpm-debug.log*
 # Next.js
 .next/
 out/
-build/
-dist/
 
 # System
 .DS_Store

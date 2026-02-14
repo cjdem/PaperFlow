@@ -1,21 +1,17 @@
 """
 上传路由 - PDF 文件上传和处理
 """
-import os
-import asyncio
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import Paper, User
 from backend.core.utils import calculate_md5
 from backend.core.file_service import file_service
 from backend.core.audit_service import log_audit_event
 from backend.core.storage_service import get_user_quota_bytes
 
-from deps import get_db, get_current_user
+from backend.deps import get_db, get_current_user
 
 router = APIRouter(prefix="/api/upload", tags=["上传"])
 

@@ -1,25 +1,22 @@
 """
 论文路由 - 论文的 CRUD 操作
 """
-import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from typing import Optional, List
+from typing import Optional
 from sqlalchemy.orm import Session
 from urllib.parse import quote
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import Paper, User
 from backend.core.file_service import file_service
 from backend.core.audit_service import log_audit_event
 from backend.core.log_service import get_logger
+from backend.core.utils import sanitize_filename
 # 注意：reanalyze_paper 使用延迟导入以避免循环导入
 
-from deps import get_current_user, get_paper_service, get_db
+from backend.deps import get_current_user, get_paper_service, get_db
 from backend.services.paper_service import PaperService
-from schemas import (
+from backend.schemas import (
     PaperResponse, PaperListResponse, UpdatePaperGroupsRequest, GroupInfo,
     BatchDeleteRequest, BatchDeleteResponse, BatchGroupRequest, BatchGroupResponse,
     FilterOptionsResponse, JournalOption
@@ -27,17 +24,6 @@ from schemas import (
 
 router = APIRouter(prefix="/api/papers", tags=["论文"])
 logger = get_logger("papers")
-
-
-def sanitize_filename(filename: str) -> str:
-    """清理文件名，移除不安全字符"""
-    # 移除或替换不安全的文件名字符
-    filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
-    # 限制长度
-    if len(filename) > 200:
-        filename = filename[:200]
-    return filename
-
 
 def paper_to_response(paper: Paper) -> PaperResponse:
     """将 Paper ORM 对象转换为响应模型"""

@@ -4,13 +4,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import Group, User
 
-from deps import get_db, get_current_user
-from schemas import CreateGroupRequest, GroupResponse
+from backend.deps import get_db, get_current_user
+from backend.schemas import CreateGroupRequest, GroupResponse
 
 router = APIRouter(prefix="/api/groups", tags=["分组"])
 

@@ -229,6 +229,35 @@ class AuthLogger:
         self.logger.info(f"👋 用户登出: {username}")
 
 
+def write_translation_log(
+    level: str,
+    message: str,
+    task_id: int | None = None,
+    paper_id: int | None = None,
+    details: dict | None = None,
+) -> None:
+    """写入翻译日志到数据库"""
+    from backend.core.db_models import Session, TranslationLog
+
+    session = Session()
+    try:
+        session.add(
+            TranslationLog(
+                task_id=task_id,
+                paper_id=paper_id,
+                level=level,
+                message=message,
+                details=details,
+                created_at=datetime.now().isoformat(),
+            )
+        )
+        session.commit()
+    except Exception as e:
+        get_logger("translation_log").error(f"写入翻译日志失败: {e}")
+    finally:
+        session.close()
+
+
 # ================= 全局日志实例 =================
 # 在模块加载时初始化日志系统
 setup_logging()

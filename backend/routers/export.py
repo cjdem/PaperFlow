@@ -9,13 +9,10 @@ import io
 import json
 from datetime import datetime
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import Paper, User
 
-from deps import get_db, get_current_user
-from schemas import BatchExportRequest
+from backend.deps import get_db, get_current_user
+from backend.schemas import BatchExportRequest
 
 router = APIRouter(prefix="/api/papers", tags=["导出"])
 

@@ -1,24 +1,18 @@
 """
 依赖项模块 - 数据库会话、JWT 认证等
 """
-import os
-import sys
 from datetime import datetime, timedelta
 from typing import Generator, Optional
-
-# 添加父目录到路径，以便导入共享模块
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session
 from backend.core.settings import settings
 from backend.services.paper_service import PaperService
 
 # 复用 db_models 中的数据库配置，确保使用同一个数据库
-from backend.core.db_models import Base, User, Session as DBSession, Workspace, WorkspaceMember
+from backend.core.db_models import User, Session as DBSession, Workspace, WorkspaceMember
 
 # ================= 数据库配置 =================
 # 直接使用 db_models 中的 Session，不创建新的引擎

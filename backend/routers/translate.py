@@ -3,11 +3,8 @@
 提供 PDF 翻译相关的 API 接口
 """
 
-import os
-import sys
 import json
 import asyncio
-from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
@@ -15,17 +12,15 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, R
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 
-# 添加父目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
 from backend.core.db_models import Paper, User, TranslationLLMProvider, TranslationQueue, TranslationLog, Session as DBSession
-from deps import get_db, get_current_user, get_current_admin, get_user_from_token
+from backend.core.utils import sanitize_filename
+from backend.deps import get_db, get_current_user, get_current_admin, get_user_from_token
 from backend.core.audit_service import log_audit_event
 from backend.core.translation_service import translation_service
 from backend.core.llm_format import normalize_translation_request_format
-from schemas import (
+from backend.schemas import (
     TranslateRequest, BatchTranslateRequest, TranslateStatusResponse,
-    TranslationQueueStats, TranslationProviderCreate, TranslationProviderResponse
+    TranslationQueueStats, TranslationProviderCreate
 )
 
 router = APIRouter(prefix="/api/translate", tags=["翻译"])
@@ -205,18 +200,6 @@ async def stream_translation_progress(
 
 
 # ================= 下载 API =================
-
-def sanitize_filename(title: str) -> str:
-    """
-    清理文件名，移除不合法字符
-    """
-    import re
-    # 移除 Windows 和 Unix 不允许的文件名字符
-    sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', title)
-    # 移除首尾空格和点
-    sanitized = sanitized.strip(' .')
-    # 如果为空，使用默认名称
-    return sanitized if sanitized else 'paper'
 
 
 @router.get("/papers/{paper_id}/download/{file_type}")

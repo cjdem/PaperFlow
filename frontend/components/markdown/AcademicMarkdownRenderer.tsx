@@ -5,7 +5,7 @@
  * 基于 Fluent 2 设计风格，支持代码高亮、数学公式
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -22,6 +22,19 @@ interface AcademicMarkdownRendererProps {
   className?: string;
   onRendered?: () => void;
 }
+
+type MarkdownCodeProps = React.ComponentPropsWithoutRef<'code'> & {
+  inline?: boolean;
+  node?: unknown;
+};
+
+type MarkdownPreProps = React.ComponentPropsWithoutRef<'pre'> & {
+  children?: React.ReactNode;
+};
+
+type MarkdownTableProps = React.ComponentPropsWithoutRef<'table'>;
+type MarkdownImageProps = React.ComponentPropsWithoutRef<'img'>;
+type MarkdownLinkProps = React.ComponentPropsWithoutRef<'a'>;
 
 export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> = ({
   content,
@@ -45,7 +58,7 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
   // 自定义组件
   const components = {
     // 代码块 - 由 rehype-highlight 处理高亮
-    code: ({ node, inline, className, children, ...props }: any) => {
+    code: ({ inline, className, children, ...props }: MarkdownCodeProps) => {
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : '';
       
@@ -67,12 +80,12 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
     },
     
     // pre 元素 - 添加语言标识和复制按钮容器
-    pre: ({ children, ...props }: any) => {
+    pre: ({ children, ...props }: MarkdownPreProps) => {
       // 获取子元素的语言
       let language = '';
       
-      React.Children.forEach(children, (child: any) => {
-        if (child && typeof child === 'object' && child.props) {
+      React.Children.forEach(children, (child) => {
+        if (React.isValidElement<{ className?: string }>(child)) {
           const childClassName = String(child.props.className || '');
           const match = /language-(\w+)/.exec(childClassName);
           if (match) {
@@ -89,14 +102,14 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
     },
     
     // 表格增强
-    table: ({ children, ...props }: any) => (
+    table: ({ children, ...props }: MarkdownTableProps) => (
       <div className="table-wrapper" style={{ overflowX: 'auto' }}>
         <table {...props}>{children}</table>
       </div>
     ),
     
     // 图片增强
-    img: ({ src, alt, ...props }: any) => (
+    img: ({ src, alt, ...props }: MarkdownImageProps) => (
       <figure className="image-figure">
         <img 
           src={src} 
@@ -109,7 +122,7 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
     ),
     
     // 链接增强 - 外部链接新窗口打开
-    a: ({ href, children, ...props }: any) => {
+    a: ({ href, children, ...props }: MarkdownLinkProps) => {
       const isExternal = href?.startsWith('http') || href?.startsWith('//');
       return (
         <a 

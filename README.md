@@ -52,7 +52,11 @@ cd PaperFlow
 ### 2. 安装依赖
 
 ```bash
+# 根目录依赖（共享模块 + PDF 翻译）
 pip install -r requirements.txt
+
+# 后端 API 依赖
+pip install -r backend/requirements.txt
 ```
 
 ### 3. 配置环境变量
@@ -168,7 +172,6 @@ PaperFlow/
 │   │   ├── MarkdownRenderer.tsx   # Markdown 渲染组件
 │   │   ├── ui/                    # UI 基础组件
 │   │   │   ├── Toast.tsx          # Toast 通知组件
-│   │   │   └── DropdownMenu.tsx   # 下拉菜单组件
 │   │   └── markdown/              # Markdown 渲染系统
 │   │       ├── AcademicMarkdownRenderer.tsx  # 学术 Markdown 渲染器
 │   │       └── renderers/         # 自定义渲染器（代码、数学公式等）

@@ -6,20 +6,17 @@ from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 from datetime import datetime
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.db_models import (
     User, Paper, Workspace, WorkspaceMember, 
     WorkspaceInvitation, WorkspacePaper
 )
 
-from deps import (
+from backend.deps import (
     get_db, get_current_user, 
     check_workspace_access, check_workspace_admin, check_workspace_owner,
     get_workspace_member
 )
-from schemas import (
+from backend.schemas import (
     CreateWorkspaceRequest, UpdateWorkspaceRequest,
     WorkspaceResponse, WorkspaceListResponse, WorkspaceDetailResponse,
     WorkspaceMemberResponse, UpdateMemberRoleRequest,
