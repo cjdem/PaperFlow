@@ -25,6 +25,17 @@ def sanitize_text_for_llm(text: str) -> str:
         return ""
     return _CONTROL_CHARS_RE.sub("", text)
 
+_THINK_TAGS_RE = re.compile(r'<think[^>]*>[\s\S]*?</think>', re.IGNORECASE)
+_THINKING_TAGS_RE = re.compile(r'<thinking[^>]*>[\s\S]*?</thinking>', re.IGNORECASE)
+
+def strip_think_tags(text: str) -> str:
+    """过滤思考模型输出的 <think>/<thinking> 标签及其内容"""
+    if not text:
+        return text
+    text = _THINK_TAGS_RE.sub("", text)
+    text = _THINKING_TAGS_RE.sub("", text)
+    return text.strip()
+
 def extract_pdf_content(file_path):
     logger.debug(f"正在读取 PDF: {file_path}")
     try:
@@ -96,7 +107,7 @@ async def task_extract_metadata(text):
             temperature=0.1,
             validator=validate_json
         )
-        content = response.choices[0].message.content
+        content = strip_think_tags(response.choices[0].message.content)
         parsed_json = json.loads(repair_json(content))
         
         if isinstance(parsed_json.get('authors'), list):
@@ -156,7 +167,7 @@ async def task_extract_metadata(text):
                     temperature=0.1,
                     validator=validate_json
                 )
-                content = response.choices[0].message.content
+                content = strip_think_tags(response.choices[0].message.content)
                 parsed_json = json.loads(repair_json(content))
                 if isinstance(parsed_json.get('authors'), list):
                     parsed_json['authors'] = ", ".join(parsed_json['authors'])
@@ -325,7 +336,7 @@ async def task_analyze_paper(full_text, timeout_seconds: float = 300.0, use_stre
                 raise ValueError(f"内容质检未通过: {content[:50]}...")
             
             logger.info("详细报告生成成功 (流式)")
-            return content
+            return strip_think_tags(content)
         else:
             # 使用普通响应
             response = await asyncio.wait_for(
@@ -339,7 +350,7 @@ async def task_analyze_paper(full_text, timeout_seconds: float = 300.0, use_stre
                 timeout=timeout_seconds
             )
             logger.info("详细报告生成成功")
-            return response.choices[0].message.content
+            return strip_think_tags(response.choices[0].message.content)
             
     except asyncio.TimeoutError:
         logger.error(f"Analysis 任务超时 (超过 {timeout_seconds} 秒)")

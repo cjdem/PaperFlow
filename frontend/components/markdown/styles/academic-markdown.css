@@ -626,3 +626,25 @@
     box-shadow: none;
   }
 }
+
+/* ==================== 图片样式 ==================== */
+.image-figure {
+  display: block;
+  max-width: 100%;
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.image-figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.image-caption {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--fluent-foreground-secondary, #888);
+  font-style: italic;
+}

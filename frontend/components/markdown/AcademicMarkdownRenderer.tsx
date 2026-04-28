@@ -36,6 +36,14 @@ type MarkdownTableProps = React.ComponentPropsWithoutRef<'table'>;
 type MarkdownImageProps = React.ComponentPropsWithoutRef<'img'>;
 type MarkdownLinkProps = React.ComponentPropsWithoutRef<'a'>;
 
+/** 过滤思考模型的 <think>...</think> 标签 */
+function stripThinkTags(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .trim()
+}
+
 export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> = ({
   content,
   showToc = true,
@@ -43,18 +51,19 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
   onRendered
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  
+  const cleanContent = stripThinkTags(content);
+
   // 渲染完成后的回调
   useEffect(() => {
-    if (content) {
+    if (cleanContent) {
       // 延迟调用以确保渲染完成
       const timer = setTimeout(() => {
         onRendered?.();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [content, onRendered]);
-  
+  }, [cleanContent, onRendered]);
+
   // 自定义组件
   const components = {
     // 代码块 - 由 rehype-highlight 处理高亮
@@ -108,17 +117,17 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
       </div>
     ),
     
-    // 图片增强
+    // 图片增强（用 span 代替 figure，避免 <figcaption> 嵌套在 <p> 中导致 hydration 错误）
     img: ({ src, alt, ...props }: MarkdownImageProps) => (
-      <figure className="image-figure">
-        <img 
-          src={src} 
-          alt={alt} 
+      <span className="image-figure">
+        <img
+          src={src}
+          alt={alt}
           loading="lazy"
           {...props}
         />
-        {alt && <figcaption>{alt}</figcaption>}
-      </figure>
+        {alt && <span className="image-caption">{alt}</span>}
+      </span>
     ),
     
     // 链接增强 - 外部链接新窗口打开
@@ -170,7 +179,7 @@ export const AcademicMarkdownRenderer: React.FC<AcademicMarkdownRendererProps> =
           rehypePlugins={[rehypeKatex, rehypeHighlight]}
           components={components}
         >
-          {content}
+          {cleanContent}
         </ReactMarkdown>
       </div>
     </div>

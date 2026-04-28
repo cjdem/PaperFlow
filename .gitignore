@@ -163,3 +163,12 @@ frontend/.turbo/
 *.sqlite3
 *.sqlite-wal
 *.sqlite-shm
+
+# oh-my-claudecode state files
+.omc/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Test fixtures
+test/

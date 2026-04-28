@@ -97,7 +97,7 @@ class GeminiClientWrapper:
         url = f"{self.base_url}/models/{model}:generateContent?key={self.api_key}"
         
         # 发送请求 - 使用更细粒度的超时配置
-        timeout = httpx.Timeout(300.0, connect=30.0)  # 总超时5分钟，连接超时30秒
+        timeout = httpx.Timeout(120.0, connect=30.0)  # 总超时5分钟，连接超时30秒
         async with build_httpx_client(timeout, self.proxy) as client:
             response = await client.post(url, json=request_body)
             response.raise_for_status()
@@ -182,7 +182,7 @@ class AnthropicClientWrapper:
             "anthropic-version": "2023-06-01"
         }
         
-        timeout = httpx.Timeout(300.0, connect=30.0)  # 总超时5分钟，连接超时30秒
+        timeout = httpx.Timeout(120.0, connect=30.0)  # 总超时5分钟，连接超时30秒
         async with build_httpx_client(timeout, self.proxy) as client:
             response = await client.post(url, json=request_body, headers=headers)
             response.raise_for_status()
@@ -314,7 +314,7 @@ class LLMManager:
                 elif request_format == "anthropic":
                     client = AnthropicClientWrapper(api_key=key, base_url=base_url or None, proxy=proxy)
                 else:  # 默认 openai - 添加超时配置
-                    timeout = httpx.Timeout(300.0, connect=30.0)
+                    timeout = httpx.Timeout(120.0, connect=30.0)
                     client = build_openai_async_client(
                         api_key=key,
                         base_url=base_url,
