@@ -34,10 +34,11 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
   - **🔁 智能重试**：可配置单模型重试次数，死磕到底
 - **📊 存储统计**：管理员可查看各用户存储使用情况
 - **🎨 现代 UI 设计**：
-  - 基于 Fluent 2 设计系统的深色主题
-  - 流畅的动画效果（卡片展开、模态框、Toast 通知）
-  - 玻璃拟态（Glassmorphism）视觉效果
-  - 论文卡片操作区与标题区分离，避免按钮挤占标题空间
+  - 基于 shadcn/ui (new-york) + Radix UI 的组件系统
+  - OKLCH 色彩空间，青绿主色 (teal-green)，支持亮/暗/系统主题切换
+  - 浮动胶囊导航栏（桌面左侧 sticky / 移动端底部 fixed）
+  - Framer Motion 弹簧动画（卡片入场、面板展开、模态框）
+  - `rounded-3xl` 圆角卡片，简洁无渐变的视觉风格
   - 响应式布局，支持移动端
 
 ## 🚀 快速开始
@@ -166,16 +167,20 @@ PaperFlow/
 │   │   ├── papers/        # 论文列表页
 │   │   ├── workspaces/    # 团队空间页
 │   │   ├── admin/         # 管理员页（含存储统计、统一 LLM 配置、翻译队列）
-│   │   └── globals.css    # Fluent 2 设计系统样式
+│   │   └── globals.css    # 全局样式 + Tailwind 主题
 │   ├── components/        # 可复用组件
 │   │   ├── admin/model-config/   # 统一模型配置组件
 │   │   ├── AdvancedSearch.tsx     # 高级搜索组件
 │   │   ├── TranslationPanel.tsx   # 翻译面板组件
 │   │   ├── TranslationMonitor.tsx # 翻译监控组件
-│   │   ├── DownloadButtons.tsx    # 下载按钮组件
 │   │   ├── MarkdownRenderer.tsx   # Markdown 渲染组件
-│   │   ├── ui/                    # UI 基础组件
-│   │   │   ├── Toast.tsx          # Toast 通知组件
+│   │   ├── AppShell.tsx           # 页面布局壳（NavBar + header + content）
+│   │   ├── NavBar.tsx             # 浮动胶囊导航栏
+│   │   ├── ui/                    # shadcn/ui 基础组件
+│   │   │   ├── button.tsx         # Button (CVA 变体)
+│   │   │   ├── dialog.tsx         # Dialog (Radix)
+│   │   │   ├── badge.tsx / input.tsx / card.tsx / progress.tsx ...
+│   │   │   └── sonner.tsx         # Toast (sonner)
 │   │   └── markdown/              # Markdown 渲染系统
 │   │       ├── AcademicMarkdownRenderer.tsx  # 学术 Markdown 渲染器
 │   │       └── renderers/         # 自定义渲染器（代码、数学公式等）
@@ -252,7 +257,7 @@ PaperFlow/
 
 ## 🛠️ 技术栈
 
-- **前端**：Next.js 16.1 + React 19.2 + TailwindCSS 4
+- **前端**：Next.js 16.1 + React 19.2 + TailwindCSS 4 + shadcn/ui + Radix UI
 - **后端**：FastAPI + SQLAlchemy
 - **数据库**：SQLite (Dev) / PostgreSQL (Prod)
 - **AI 集成**：OpenAI SDK (支持 OpenAI, Gemini, Claude, DeepSeek 等兼容 API)

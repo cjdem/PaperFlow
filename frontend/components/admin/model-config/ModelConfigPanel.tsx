@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { ModelProviderForm, createTargetOptions } from './ModelProviderForm';
 import { ModelTargetSection } from './ModelTargetSection';
 import { modelConfigApi } from './modelConfigApi';
@@ -144,30 +146,30 @@ export function ModelConfigPanel() {
       const result = await modelConfigApi.test(config.target, config.id);
       const latency = result.latency_ms !== undefined ? `（${result.latency_ms}ms）` : '';
       const model = result.model ? `\n模型：${result.model}` : '';
-      alert(`✅ ${result.message}${latency}${model}`);
+      toast.success(`${result.message}${latency}${model}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '测试失败';
-      alert(`❌ ${message}`);
+      toast.error(message);
     } finally {
       setTestingId(null);
     }
   };
 
   if (loading) {
-    return <div className="text-[var(--fluent-foreground-secondary)]">加载中...</div>;
+    return <div className="text-muted-foreground">加载中...</div>;
   }
 
   return (
-    <div className="space-y-6 fluent-fade-in">
+    <div className="space-y-6">
       {loadError && (
-        <div className="fluent-card p-4 border border-red-500/40 bg-red-500/10">
-          <div className="text-red-300 font-medium">模型配置加载失败</div>
-          <p className="text-sm text-[var(--fluent-foreground-secondary)] mt-1">
+        <div className="rounded-3xl border bg-card p-4 border-destructive/40 bg-destructive/10">
+          <div className="text-destructive font-medium">模型配置加载失败</div>
+          <p className="text-sm text-muted-foreground mt-1">
             {loadError}。请确认后端服务已重启并加载了最新的 /api/admin/model-configs 接口。
           </p>
-          <button className="fluent-button px-4 py-2 mt-3" onClick={loadConfigs}>
+          <Button className="mt-3" onClick={loadConfigs}>
             重试
-          </button>
+          </Button>
         </div>
       )}
       {formData && (

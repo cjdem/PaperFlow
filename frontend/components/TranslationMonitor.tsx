@@ -3,6 +3,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { apiClient } from '@/lib/apiClient';
 import { usePolling } from '@/lib/usePolling';
+import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 interface QueueStats {
   pending: number;
@@ -43,13 +49,13 @@ const STATUS_LABELS: Record<string, string> = {
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
-    pending: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
-    processing: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-    completed: 'fluent-badge-success',
-    failed: 'fluent-badge-error',
-    cancelled: 'fluent-badge',
+    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    processing: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    completed: 'bg-green-500/20 text-green-400 border-green-500/30',
+    failed: 'bg-destructive/20 text-destructive border-destructive/30',
+    cancelled: 'bg-muted text-muted-foreground border-border',
   };
-  return styles[status] || 'fluent-badge';
+  return styles[status] || 'bg-muted text-muted-foreground border-border';
 };
 
 export default function TranslationMonitor() {
@@ -127,7 +133,7 @@ export default function TranslationMonitor() {
       await fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : '取消任务失败';
-      alert(`❌ ${message}`);
+      toast.error(message);
     }
   };
 
@@ -140,7 +146,7 @@ export default function TranslationMonitor() {
       await fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : '重试任务失败';
-      alert(`❌ ${message}`);
+      toast.error(message);
     }
   };
 
@@ -148,8 +154,8 @@ export default function TranslationMonitor() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-[var(--fluent-blue-500)] border-t-transparent rounded-full animate-spin" />
-          <div className="text-[var(--fluent-foreground-secondary)]" role="status" aria-live="polite">加载中...</div>
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="text-muted-foreground" role="status" aria-live="polite">加载中...</div>
         </div>
       </div>
     );
@@ -158,63 +164,63 @@ export default function TranslationMonitor() {
   const enabledProviderCount = providers.filter(provider => provider.enabled).length;
 
   return (
-    <div className="space-y-6 fluent-fade-in">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <div className="fluent-stat-card group">
+        <div className="rounded-2xl border bg-card p-4 transition-colors">
           <div className="relative">
-            <div className="text-3xl font-bold text-[var(--fluent-foreground)] mb-1">{stats?.pending || 0}</div>
-            <div className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">待处理</div>
+            <div className="text-3xl font-bold text-foreground mb-1">{stats?.pending || 0}</div>
+            <div className="text-muted-foreground text-sm font-medium">待处理</div>
           </div>
         </div>
-        <div className="fluent-stat-card group">
+        <div className="rounded-2xl border bg-card p-4 transition-colors">
           <div className="relative">
-            <div className="text-3xl font-bold text-[var(--fluent-foreground)] mb-1">{stats?.processing || 0}</div>
-            <div className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">处理中</div>
+            <div className="text-3xl font-bold text-foreground mb-1">{stats?.processing || 0}</div>
+            <div className="text-muted-foreground text-sm font-medium">处理中</div>
           </div>
         </div>
-        <div className="fluent-stat-card group">
+        <div className="rounded-2xl border bg-card p-4 transition-colors">
           <div className="relative">
-            <div className="text-3xl font-bold text-[var(--fluent-foreground)] mb-1">{stats?.completed || 0}</div>
-            <div className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">已完成</div>
+            <div className="text-3xl font-bold text-foreground mb-1">{stats?.completed || 0}</div>
+            <div className="text-muted-foreground text-sm font-medium">已完成</div>
           </div>
         </div>
-        <div className="fluent-stat-card group">
+        <div className="rounded-2xl border bg-card p-4 transition-colors">
           <div className="relative">
-            <div className="text-3xl font-bold text-[var(--fluent-foreground)] mb-1">{stats?.failed || 0}</div>
-            <div className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">失败</div>
+            <div className="text-3xl font-bold text-foreground mb-1">{stats?.failed || 0}</div>
+            <div className="text-muted-foreground text-sm font-medium">失败</div>
           </div>
         </div>
-        <div className="fluent-stat-card group">
+        <div className="rounded-2xl border bg-card p-4 transition-colors">
           <div className="relative">
-            <div className="text-3xl font-bold text-[var(--fluent-foreground)] mb-1">{stats?.untranslated_papers || 0}</div>
-            <div className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">未翻译</div>
+            <div className="text-3xl font-bold text-foreground mb-1">{stats?.untranslated_papers || 0}</div>
+            <div className="text-muted-foreground text-sm font-medium">未翻译</div>
           </div>
         </div>
-        <div className="fluent-stat-card group">
+        <div className="rounded-2xl border bg-card p-4 transition-colors">
           <div className="relative">
-            <div className="text-3xl font-bold text-[var(--fluent-foreground)] mb-1">{enabledProviderCount}/{providers.length}</div>
-            <div className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">可用引擎</div>
+            <div className="text-3xl font-bold text-foreground mb-1">{enabledProviderCount}/{providers.length}</div>
+            <div className="text-muted-foreground text-sm font-medium">可用引擎</div>
           </div>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
         {stats?.is_running ? (
-          <button onClick={stopWorker} className="fluent-button px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium">
+          <Button onClick={stopWorker} className="bg-destructive hover:bg-destructive/90 text-white">
             停止队列
-          </button>
+          </Button>
         ) : (
-          <button onClick={startWorker} className="fluent-button px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium">
+          <Button onClick={startWorker} className="bg-green-600 hover:bg-green-700 text-white">
             启动队列
-          </button>
+          </Button>
         )}
-        <button onClick={fetchData} className="fluent-button fluent-button-subtle px-5 py-2.5 font-medium">
+        <Button onClick={fetchData} variant="outline">
           刷新
-        </button>
+        </Button>
         <select
           value={statusFilter}
           onChange={event => setStatusFilter(event.target.value)}
-          className="fluent-select"
+          className="h-9 rounded-md border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <option value="">全部状态</option>
           <option value="pending">待处理</option>
@@ -224,18 +230,18 @@ export default function TranslationMonitor() {
         </select>
       </div>
 
-      <div className="fluent-card overflow-hidden">
+      <div className="rounded-2xl border bg-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="fluent-table w-full">
+          <table className="w-full text-sm">
             <thead>
-              <tr>
-                <th className="text-left">论文</th>
-                <th className="text-left">状态</th>
-                <th className="text-left">进度</th>
-                <th className="text-left">阶段</th>
-                <th className="text-left">重试</th>
-                <th className="text-left">创建时间</th>
-                <th className="text-left">操作</th>
+              <tr className="bg-muted/30">
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">论文</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">状态</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">进度</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">阶段</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">重试</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">创建时间</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -243,52 +249,50 @@ export default function TranslationMonitor() {
                 <tr>
                   <td colSpan={7} className="text-center py-12">
                     <div className="text-4xl mb-2">📭</div>
-                    <span className="text-[var(--fluent-foreground-secondary)]">暂无翻译任务</span>
+                    <span className="text-muted-foreground">暂无翻译任务</span>
                   </td>
                 </tr>
               ) : (
                 tasks.map(task => (
-                  <tr key={task.id}>
-                    <td>
-                      <div className="max-w-xs truncate font-medium text-[var(--fluent-foreground)]" title={task.paper_title || undefined}>
+                  <tr key={task.id} className="border-t border-border hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="max-w-xs truncate font-medium text-foreground" title={task.paper_title || undefined}>
                         {task.paper_title || `论文 #${task.paper_id}`}
                       </div>
                     </td>
-                    <td>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(task.status)}`}>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className={cn('rounded-full text-xs', getStatusBadge(task.status))}>
                         {STATUS_LABELS[task.status] || task.status}
-                      </span>
+                      </Badge>
                     </td>
-                    <td>
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-20 fluent-progress h-2">
-                          <div className="fluent-progress-bar h-2" style={{ width: `${task.progress}%` }} />
-                        </div>
-                        <span className="text-[var(--fluent-foreground-secondary)] text-xs font-medium">{task.progress}%</span>
+                        <Progress value={task.progress} className="h-2 w-20" />
+                        <span className="text-muted-foreground text-xs font-medium">{task.progress}%</span>
                       </div>
                     </td>
-                    <td className="text-[var(--fluent-foreground-secondary)] text-xs">{task.current_stage || '-'}</td>
-                    <td className="text-[var(--fluent-foreground-secondary)] text-xs">{task.retry_count > 0 ? task.retry_count : '-'}</td>
-                    <td className="text-[var(--fluent-foreground-secondary)] text-xs">{new Date(task.created_at).toLocaleString()}</td>
-                    <td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{task.current_stage || '-'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{task.retry_count > 0 ? task.retry_count : '-'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{new Date(task.created_at).toLocaleString()}</td>
+                    <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
                         {task.status === 'pending' && (
-                          <button onClick={() => cancelTask(task.id)} className="text-red-400 hover:text-red-300 text-sm font-medium transition">
+                          <Button variant="ghost" size="sm" onClick={() => cancelTask(task.id)} className="text-destructive hover:text-destructive/80 h-auto px-2 py-1 text-sm font-medium">
                             取消
-                          </button>
+                          </Button>
                         )}
                         {(task.status === 'failed' || task.status === 'cancelled') && (
-                          <button onClick={() => retryTask(task.id)} className="text-green-400 hover:text-green-300 text-sm font-medium transition">
+                          <Button variant="ghost" size="sm" onClick={() => retryTask(task.id)} className="text-green-500 hover:text-green-400 h-auto px-2 py-1 text-sm font-medium">
                             重试
-                          </button>
+                          </Button>
                         )}
                         {task.status === 'processing' && (
-                          <button onClick={() => retryTask(task.id, true)} className="text-yellow-400 hover:text-yellow-300 text-sm font-medium transition">
+                          <Button variant="ghost" size="sm" onClick={() => retryTask(task.id, true)} className="text-yellow-500 hover:text-yellow-400 h-auto px-2 py-1 text-sm font-medium">
                             强制重试
-                          </button>
+                          </Button>
                         )}
                         {task.status === 'failed' && task.error_message && (
-                          <span className="text-red-400 text-xs cursor-help underline decoration-dotted" title={task.error_message}>
+                          <span className="text-destructive text-xs cursor-help underline decoration-dotted" title={task.error_message}>
                             查看错误
                           </span>
                         )}
@@ -302,10 +306,10 @@ export default function TranslationMonitor() {
         </div>
       </div>
 
-      <div className="fluent-card p-5">
-        <h4 className="text-base font-semibold text-[var(--fluent-foreground)] mb-3">配置入口</h4>
-        <p className="text-sm text-[var(--fluent-foreground-secondary)]">
-          翻译引擎已统一到“LLM 提供商”页签管理；此处只展示翻译队列运行状态和任务操作。
+      <div className="rounded-2xl border bg-card p-5">
+        <h4 className="text-base font-semibold text-foreground mb-3">配置入口</h4>
+        <p className="text-sm text-muted-foreground">
+          翻译引擎已统一到"LLM 提供商"页签管理；此处只展示翻译队列运行状态和任务操作。
         </p>
       </div>
     </div>

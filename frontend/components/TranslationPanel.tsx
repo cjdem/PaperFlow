@@ -3,6 +3,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient, apiBaseUrl } from '@/lib/apiClient';
 import DownloadButtons from './DownloadButtons';
+import { Loader2, Play } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface TranslationPanelProps {
   paperId: number;
@@ -79,7 +91,7 @@ export default function TranslationPanel({
       eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
         setStatus(prev => prev ? { ...prev, ...data } : null);
-        
+
         if (data.status === 'completed' || data.status === 'failed') {
           eventSource.close();
           fetchStatus();
@@ -103,7 +115,7 @@ export default function TranslationPanel({
   const startTranslation = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       await apiClient.post(`/api/translate/papers/${paperId}`, {
         provider_id: selectedProvider
@@ -136,55 +148,50 @@ export default function TranslationPanel({
   const getStatusColor = () => {
     switch (status?.status) {
       case 'pending':
-        return 'text-yellow-400';
+        return 'text-yellow-500';
       case 'processing':
-        return 'text-blue-400';
+        return 'text-blue-500';
       case 'completed':
-        return 'text-green-400';
+        return 'text-green-500';
       case 'failed':
-        return 'text-red-400';
+        return 'text-destructive';
       default:
-        return 'text-gray-400';
+        return 'text-muted-foreground';
     }
   };
 
   if (!hasFile) {
     const noFileContent = (
       <>
-        <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-2">📄 论文翻译</h3>
-        <p className="text-[var(--fluent-foreground-secondary)] text-sm">此论文没有关联的 PDF 文件，无法翻译</p>
+        <h3 className="text-lg font-semibold text-foreground mb-2">📄 论文翻译</h3>
+        <p className="text-muted-foreground text-sm">此论文没有关联的 PDF 文件，无法翻译</p>
       </>
     );
     if (embedded) {
       return noFileContent;
     }
-    return <div className="fluent-card p-5">{noFileContent}</div>;
+    return <div className="rounded-2xl bg-card border border-border p-5">{noFileContent}</div>;
   }
 
   const content = (
     <>
-      <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-4">📄 论文翻译</h3>
-      
+      <h3 className="text-lg font-semibold text-foreground mb-4">📄 论文翻译</h3>
+
       {/* 状态显示 */}
       <div className="mb-4">
-        <span className={`font-medium ${getStatusColor()}`} role="status" aria-live="polite">
+        <Badge variant="outline" className={cn('font-medium', getStatusColor())} role="status" aria-live="polite">
           {getStatusText()}
-        </span>
+        </Badge>
         {status?.error && (
-          <p className="text-red-400 text-sm mt-1">{status.error}</p>
+          <p className="text-destructive text-sm mt-1">{status.error}</p>
         )}
       </div>
 
       {/* 进度条 */}
       {status?.status === 'processing' && (
         <div className="mb-4">
-          <div className="fluent-progress h-2">
-            <div
-              className="fluent-progress-bar h-2"
-              style={{ width: `${status.progress}%` }}
-            />
-          </div>
-          <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-2">
+          <Progress value={status.progress} className="h-2" />
+          <p className="text-xs text-muted-foreground mt-2">
             正在翻译中，请稍候...
           </p>
         </div>
@@ -195,37 +202,46 @@ export default function TranslationPanel({
         <div className="space-y-3">
           {providers.length > 0 && (
             <div>
-              <label className="block text-[var(--fluent-foreground-secondary)] text-sm mb-2 font-medium">翻译引擎</label>
-              <select
-                value={selectedProvider || ''}
-                onChange={(e) => setSelectedProvider(e.target.value ? Number(e.target.value) : null)}
-                className="fluent-select w-full"
+              <label className="block text-muted-foreground text-sm mb-2 font-medium">翻译引擎</label>
+              <Select
+                value={selectedProvider !== null ? String(selectedProvider) : 'auto'}
+                onValueChange={(val) => setSelectedProvider(val === 'auto' ? null : Number(val))}
               >
-                <option value="">自动选择</option>
-                {providers.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.engine_type})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="自动选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">自动选择</SelectItem>
+                  {providers.map(p => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name} ({p.engine_type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
-          
-          <button
+
+          <Button
             onClick={startTranslation}
             disabled={loading}
-            className="fluent-button fluent-button-accent w-full py-2.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 font-medium"
           >
             {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <>
+                <Loader2 className="animate-spin h-4 w-4" />
                 添加中...
-              </span>
-            ) : '🚀 开始翻译'}
-          </button>
-          
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                开始翻译
+              </>
+            )}
+          </Button>
+
           {error && (
-            <p className="text-red-400 text-sm">{error}</p>
+            <p className="text-destructive text-sm">{error}</p>
           )}
         </div>
       )}
@@ -233,7 +249,7 @@ export default function TranslationPanel({
       {/* 下载按钮 */}
       {status?.status === 'completed' && (
         <div className="space-y-3">
-          <p className="text-[var(--fluent-foreground-secondary)] text-sm font-medium">📥 下载翻译结果</p>
+          <p className="text-muted-foreground text-sm font-medium">📥 下载翻译结果</p>
           <DownloadButtons
             paperId={paperId}
             paperTitle={paperTitle}
@@ -241,7 +257,7 @@ export default function TranslationPanel({
             translationStatus={status.status}
           />
           {status.translated_at && (
-            <p className="text-[var(--fluent-foreground-secondary)] text-xs mt-2 opacity-70">
+            <p className="text-muted-foreground text-xs mt-2 opacity-70">
               翻译完成于: {new Date(status.translated_at).toLocaleString()}
             </p>
           )}
@@ -250,8 +266,8 @@ export default function TranslationPanel({
 
       {/* 等待中状态 */}
       {status?.status === 'pending' && (
-        <div className="flex items-center gap-3 text-[var(--fluent-foreground-secondary)] text-sm">
-          <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center gap-3 text-muted-foreground text-sm">
+          <Loader2 className="animate-spin h-4 w-4 text-yellow-500" />
           论文已加入翻译队列，请等待处理...
         </div>
       )}
@@ -261,5 +277,5 @@ export default function TranslationPanel({
   if (embedded) {
     return content;
   }
-  return <div className="fluent-card p-5">{content}</div>;
+  return <div className="rounded-2xl bg-card border border-border p-5">{content}</div>;
 }

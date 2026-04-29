@@ -166,6 +166,9 @@ frontend/.turbo/
 # oh-my-claudecode state files
 .omc/
 
+# Claude Code state files
+.claude/
+
 # Playwright MCP artifacts
 .playwright-mcp/
 
