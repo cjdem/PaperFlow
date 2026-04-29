@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/apiClient';
 import { useAuth } from '@/lib/useAuth';
 import { usePolling } from '@/lib/usePolling';
 import TranslationMonitor from '@/components/TranslationMonitor';
+import { ModelConfigPanel } from '@/components/admin/model-config/ModelConfigPanel';
 
 interface AdminStats {
     user_count: number;
@@ -68,78 +69,6 @@ interface AdminGroupDetail {
     papers: AdminGroupPaperItem[];
 }
 
-interface LLMProvider {
-    id: number;
-    name: string;
-    base_url: string;
-    proxy?: string | null;
-    api_key: string;
-    models: string;
-    api_type: string;
-    request_format?: string;
-    pool_type: string;
-    weight: number;
-    priority: number;
-    enabled: boolean;
-    is_primary: boolean;
-    last_success_at?: string | null;
-    last_failure_at?: string | null;
-    last_error?: string | null;
-    avg_latency_ms?: number | null;
-}
-
-const createEmptyProvider = (poolType: string): Omit<LLMProvider, 'id' | 'is_primary'> => ({
-    name: '',
-    base_url: '',
-    proxy: '',
-    api_key: '',
-    models: '',
-    api_type: 'openai',
-    request_format: 'openai',
-    pool_type: poolType,
-    weight: 10,
-    priority: 1,
-    enabled: true,
-});
-
-const API_TYPE_INFO: Record<string, { label: string; urlHint: string; keyHint: string }> = {
-    openai: {
-        label: 'OpenAI 兼容',
-        urlHint: 'https://api.openai.com/v1 或 https://api.deepseek.com/v1',
-        keyHint: 'sk-...',
-    },
-    openai_response: {
-        label: 'OpenAI Responses',
-        urlHint: 'https://api.openai.com/v1 或兼容 Responses 的网关',
-        keyHint: 'sk-...',
-    },
-    gemini: {
-        label: 'Google Gemini',
-        urlHint: 'https://generativelanguage.googleapis.com/v1beta',
-        keyHint: 'AIzaSy...',
-    },
-    anthropic: {
-        label: 'Anthropic Claude',
-        urlHint: 'https://api.anthropic.com',
-        keyHint: 'sk-ant-...',
-    },
-};
-
-const POOL_INFO: Record<string, { label: string; icon: string; description: string; color: string }> = {
-    metadata: {
-        label: '元数据提取',
-        icon: '📋',
-        description: '用于提取论文标题、作者、期刊等元数据信息。推荐使用响应快速的小模型。',
-        color: 'blue',
-    },
-    analysis: {
-        label: '深度分析',
-        icon: '🔬',
-        description: '用于生成论文详细分析报告。推荐使用推理能力强的大模型。',
-        color: 'purple',
-    },
-};
-
 export default function AdminPage() {
     const router = useRouter();
     const { user, loading: authLoading, isAuthorized } = useAuth({
@@ -152,15 +81,8 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
-    const [providers, setProviders] = useState<LLMProvider[]>([]);
     const [activeTab, setActiveTab] = useState<'stats' | 'storage' | 'llm' | 'translate'>('stats');
-    const [activePoolTab, setActivePoolTab] = useState<'metadata' | 'analysis'>('metadata');
-    const [editingProvider, setEditingProvider] = useState<LLMProvider | null>(null);
-    const [isAdding, setIsAdding] = useState(false);
-    const [formData, setFormData] = useState(createEmptyProvider('metadata'));
     const [retryCount, setRetryCount] = useState('3');
-    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-    const [testingProviderId, setTestingProviderId] = useState<number | null>(null);
     const [statsDetailType, setStatsDetailType] = useState<'users' | 'papers' | 'groups' | null>(null);
     const [statsDetailLoading, setStatsDetailLoading] = useState(false);
     const [userDetails, setUserDetails] = useState<AdminUserDetail[]>([]);
@@ -181,13 +103,11 @@ export default function AdminPage() {
     };
 
     const loadData = useCallback(async () => {
-        const [statsRes, providersRes, storageRes] = await Promise.all([
+        const [statsRes, storageRes] = await Promise.all([
             apiClient.get<AdminStats>('/api/admin/stats'),
-            apiClient.get<LLMProvider[]>('/api/admin/llm-providers'),
             apiClient.get<StorageStats>('/api/admin/storage-stats')
         ]);
         setStats(statsRes);
-        setProviders(providersRes);
         setStorageStats(storageRes);
     }, []);
 
@@ -205,7 +125,7 @@ export default function AdminPage() {
 
     usePolling(handleInitialLoad, {
         enabled: isAuthorized,
-        deps: [activeTab, activePoolTab]
+        deps: [activeTab]
     });
 
     const openStatsDetail = async (type: 'users' | 'papers' | 'groups') => {
@@ -262,142 +182,6 @@ export default function AdminPage() {
         }
     };
 
-    const handleEdit = (p: LLMProvider) => {
-        setEditingProvider(p);
-        setFormData({
-            name: p.name,
-            base_url: p.base_url,
-            proxy: p.proxy || '',
-            api_key: p.api_key,
-            models: p.models,
-            api_type: p.api_type,
-            request_format: p.request_format || p.api_type,
-            pool_type: p.pool_type,
-            weight: p.weight,
-            priority: p.priority,
-            enabled: p.enabled,
-        });
-        setIsAdding(false);
-    };
-
-    const handleAdd = (poolType: string) => {
-        setEditingProvider(null);
-        setFormData(createEmptyProvider(poolType));
-        setIsAdding(true);
-    };
-
-    const handleSave = async () => {
-        setSaveStatus('saving');
-
-        try {
-            let response: LLMProvider | undefined;
-            if (isAdding) {
-                response = await apiClient.post<LLMProvider>('/api/admin/llm-providers', formData);
-            } else if (editingProvider) {
-                response = await apiClient.put<LLMProvider>(`/api/admin/llm-providers/${editingProvider.id}`, formData);
-            }
-
-            if (!response) {
-                throw new Error('保存失败');
-            }
-
-            const savedProvider: LLMProvider = response;
-
-            if (isAdding) {
-                setProviders(prev => [...prev, savedProvider]);
-            } else if (editingProvider) {
-                setProviders(prev => prev.map(p =>
-                    p.id === editingProvider.id ? savedProvider : p
-                ));
-            }
-
-            setSaveStatus('saved');
-            setEditingProvider(null);
-            setIsAdding(false);
-
-            setTimeout(() => setSaveStatus('idle'), 2000);
-
-        } catch (error) {
-            setSaveStatus('error');
-            console.error('保存失败:', error);
-            setTimeout(() => setSaveStatus('idle'), 3000);
-        }
-    };
-
-    const handleDelete = async (id: number) => {
-        if (!confirm('确定要删除这个 LLM 提供商吗？')) return;
-
-        const previousProviders = [...providers];
-        setProviders(prev => prev.filter(p => p.id !== id));
-
-        try {
-            await apiClient.delete(`/api/admin/llm-providers/${id}`);
-        } catch {
-            setProviders(previousProviders);
-        }
-    };
-
-    const toggleProvider = async (id: number, enabled: boolean) => {
-        setProviders(prev => prev.map(p =>
-            p.id === id ? { ...p, enabled: !enabled } : p
-        ));
-
-        try {
-            await apiClient.post(`/api/admin/llm-providers/${id}/toggle`);
-        } catch {
-            setProviders(prev => prev.map(p =>
-                p.id === id ? { ...p, enabled: enabled } : p
-            ));
-        }
-    };
-
-    const setPrimary = async (id: number) => {
-        const targetProvider = providers.find(p => p.id === id);
-        if (!targetProvider) return;
-
-        const previousProviders = [...providers];
-        setProviders(prev => prev.map(p => {
-            if (p.pool_type === targetProvider.pool_type) {
-                return { ...p, is_primary: p.id === id };
-            }
-            return p;
-        }));
-
-        try {
-            await apiClient.post(`/api/admin/llm-providers/${id}/set-primary`);
-        } catch {
-            setProviders(previousProviders);
-        }
-    };
-
-    const testProvider = async (p: LLMProvider) => {
-        setTestingProviderId(p.id);
-        try {
-            const res = await apiClient.post<{
-                success: boolean;
-                message: string;
-                latency_ms?: number;
-                model?: string;
-                api_type?: string;
-                sample?: string;
-            }>(`/api/admin/llm-providers/${p.id}/test`);
-
-            const latencyText = res.latency_ms !== undefined ? `（${res.latency_ms}ms）` : '';
-            const modelText = res.model ? `模型: ${res.model}` : '';
-            alert(`✅ ${res.message}${latencyText}${modelText ? `\n${modelText}` : ''}`);
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : '测试失败';
-            alert(`❌ ${msg}`);
-        } finally {
-            setTestingProviderId(null);
-        }
-    };
-
-    const metadataProviders = providers.filter(p => p.pool_type === 'metadata');
-    const analysisProviders = providers.filter(p => p.pool_type === 'analysis');
-    const currentPoolProviders = activePoolTab === 'metadata' ? metadataProviders : analysisProviders;
-    const poolInfo = POOL_INFO[activePoolTab];
-
     if (authLoading || loading) {
         return (
             <div className="min-h-screen fluent-background flex items-center justify-center">
@@ -408,208 +192,6 @@ export default function AdminPage() {
             </div>
         );
     }
-
-    const renderProviderForm = () => {
-        if (!isAdding && !editingProvider) return null;
-
-        const selectedFormat = formData.request_format || formData.api_type || 'openai';
-        const apiInfo = API_TYPE_INFO[selectedFormat] || API_TYPE_INFO.openai;
-
-        return (
-            <div className="fluent-card p-6 border-2 border-purple-500/50 mb-6 fluent-scale-in">
-                <h3 className="text-lg font-semibold text-[var(--fluent-foreground)] mb-5">
-                    {isAdding ? `➕ 添加 ${POOL_INFO[formData.pool_type]?.label} 模型` : '✏️ 编辑 LLM 提供商'}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">名称</label>
-                        <input
-                            type="text"
-                            value={formData.name}
-                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="例如：OpenAI GPT-4o"
-                            className="fluent-input w-full"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">API 类型</label>
-                        <select
-                            value={selectedFormat}
-                            onChange={e => setFormData({
-                                ...formData,
-                                request_format: e.target.value,
-                                api_type: e.target.value === 'openai_response' ? 'openai' : e.target.value
-                            })}
-                            className="fluent-select w-full"
-                        >
-                            <option value="openai">OpenAI Chat Completions</option>
-                            <option value="openai_response">OpenAI Responses</option>
-                            <option value="gemini">Google Gemini</option>
-                            <option value="anthropic">Anthropic Claude</option>
-                        </select>
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">Base URL</label>
-                        <input
-                            type="text"
-                            value={formData.base_url}
-                            onChange={e => setFormData({ ...formData, base_url: e.target.value })}
-                            placeholder={apiInfo.urlHint}
-                            className="fluent-input w-full"
-                        />
-                        <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-1.5">💡 提示：{apiInfo.urlHint}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">Proxy（可选）</label>
-                        <input
-                            type="text"
-                            value={formData.proxy || ''}
-                            onChange={e => setFormData({ ...formData, proxy: e.target.value })}
-                            placeholder="http://127.0.0.1:7890"
-                            className="fluent-input w-full"
-                        />
-                        <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-1.5">💡 支持 http/https 代理，留空则不使用</p>
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">API Key</label>
-                        <input
-                            type="password"
-                            value={formData.api_key}
-                            onChange={e => setFormData({ ...formData, api_key: e.target.value })}
-                            placeholder={apiInfo.keyHint}
-                            className="fluent-input w-full"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">模型名称</label>
-                        <input
-                            type="text"
-                            value={formData.models}
-                            onChange={e => setFormData({ ...formData, models: e.target.value })}
-                            placeholder="例如：gpt-4o, gpt-4o-mini"
-                            className="fluent-input w-full"
-                        />
-                        <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-1.5">💡 多个模型用逗号分隔，按顺序依次尝试</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--fluent-foreground)] mb-2">优先级 (1 最高)</label>
-                        <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            value={formData.priority}
-                            onChange={e => setFormData({ ...formData, priority: Number(e.target.value) })}
-                            className="fluent-input w-full"
-                        />
-                        <p className="text-xs text-[var(--fluent-foreground-secondary)] mt-1.5">💡 数值越小优先级越高，会优先尝试</p>
-                    </div>
-                </div>
-                <div className="flex gap-3 mt-6 pt-5 border-t border-[var(--fluent-divider)]">
-                    <button
-                        onClick={handleSave}
-                        disabled={saveStatus === 'saving'}
-                        className={`fluent-button px-5 py-2.5 min-w-[120px] font-medium ${
-                            saveStatus === 'saving' ? 'bg-purple-400 cursor-wait' :
-                            saveStatus === 'saved' ? 'bg-green-600 text-white' :
-                            saveStatus === 'error' ? 'bg-red-600 text-white' :
-                            'fluent-button-accent'
-                        }`}
-                    >
-                        {saveStatus === 'saving' ? '⏳ 保存中...' :
-                            saveStatus === 'saved' ? '✅ 已保存' :
-                            saveStatus === 'error' ? '❌ 保存失败' :
-                            '💾 保存'}
-                    </button>
-                    <button
-                        onClick={() => { setEditingProvider(null); setIsAdding(false); setSaveStatus('idle'); }}
-                        className="fluent-button fluent-button-subtle px-5 py-2.5 font-medium"
-                        disabled={saveStatus === 'saving'}
-                    >
-                        取消
-                    </button>
-                </div>
-            </div>
-        );
-    };
-
-    const renderProviderCard = (p: LLMProvider) => (
-        <div key={p.id} className={`fluent-card p-5 transition-all hover:shadow-lg ${p.is_primary ? 'border-purple-500/70 shadow-purple-500/10' : ''}`}>
-            <div className="flex justify-between items-start gap-4">
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
-                        <h3 className="text-lg font-semibold text-[var(--fluent-foreground)]">{p.name}</h3>
-                        {p.is_primary && <span className="fluent-badge-accent px-2.5 py-1 text-xs font-medium">⭐ 主要</span>}
-                        <span className={`fluent-badge px-2.5 py-1 text-xs font-medium ${p.enabled ? 'fluent-badge-success' : ''}`}>
-                            {p.enabled ? '✓ 启用' : '○ 禁用'}
-                        </span>
-                        <span className="fluent-badge px-2.5 py-1 text-xs">
-                            {API_TYPE_INFO[p.request_format || p.api_type]?.label || p.request_format || p.api_type}
-                        </span>
-                    </div>
-                    <div className="text-sm text-[var(--fluent-foreground-secondary)] space-y-1.5">
-                        <div className="flex items-center gap-2">
-                            <span className="opacity-60">🔗</span>
-                            <span className="truncate">{p.base_url}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="opacity-60">🧠</span>
-                            <span className="text-purple-400 font-medium">{p.models}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="opacity-60">🎯</span>
-                            <span>优先级: <span className="text-yellow-400 font-medium">{p.priority}</span></span>
-                        </div>
-                        {p.avg_latency_ms !== undefined && p.avg_latency_ms !== null && (
-                            <div className="flex items-center gap-2">
-                                <span className="opacity-60">⏱️</span>
-                                <span>平均延迟: <span className="text-green-400 font-medium">{p.avg_latency_ms}ms</span></span>
-                            </div>
-                        )}
-                        {p.last_success_at && (
-                            <div className="flex items-center gap-2">
-                                <span className="opacity-60">✅</span>
-                                <span>最后成功: {new Date(p.last_success_at).toLocaleString()}</span>
-                            </div>
-                        )}
-                        {p.last_failure_at && (
-                            <div className="flex items-center gap-2">
-                                <span className="opacity-60">⚠️</span>
-                                <span>最后失败: {new Date(p.last_failure_at).toLocaleString()}</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                    <button onClick={() => handleEdit(p)} className="fluent-button fluent-button-subtle px-3 py-1.5 text-sm font-medium">
-                        ✏️ 编辑
-                    </button>
-                    <button
-                        onClick={() => testProvider(p)}
-                        disabled={testingProviderId === p.id}
-                        className={`fluent-button px-3 py-1.5 text-sm font-medium ${
-                            testingProviderId === p.id ? 'bg-purple-400/30 text-purple-200 cursor-wait' : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
-                        }`}
-                    >
-                        {testingProviderId === p.id ? '🔌 测试中...' : '🔌 测试连接'}
-                    </button>
-                    <button
-                        onClick={() => toggleProvider(p.id, p.enabled)}
-                        className={`fluent-button px-3 py-1.5 text-sm font-medium ${p.enabled ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}
-                    >
-                        {p.enabled ? '⏸ 禁用' : '▶ 启用'}
-                    </button>
-                    {!p.is_primary && p.enabled && (
-                        <button onClick={() => setPrimary(p.id)} className="fluent-button px-3 py-1.5 text-sm bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 font-medium">
-                            ⭐ 设为主要
-                        </button>
-                    )}
-                    <button onClick={() => handleDelete(p.id)} className="fluent-button px-3 py-1.5 text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium">
-                        🗑️ 删除
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 
     const renderStatsDetailModal = () => {
         if (!statsDetailType) return null;
@@ -972,80 +554,10 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                {/* LLM Tab with Pool Sub-tabs */}
+                {/* LLM Tab */}
                 {activeTab === 'llm' && (
                     <div className="space-y-6 fluent-fade-in" style={{ animationDelay: '100ms' }}>
-                        {/* Pool Tabs */}
-                        <div className="fluent-card p-4">
-                            <div className="flex gap-4">
-                                {(['metadata', 'analysis'] as const).map(poolType => {
-                                    const info = POOL_INFO[poolType];
-                                    const poolProviders = poolType === 'metadata' ? metadataProviders : analysisProviders;
-                                    const isActive = activePoolTab === poolType;
-
-                                    return (
-                                        <button
-                                            key={poolType}
-                                            onClick={() => { setActivePoolTab(poolType); setIsAdding(false); setEditingProvider(null); }}
-                                            className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                                                isActive
-                                                    ? info.color === 'blue'
-                                                        ? 'bg-blue-500/20 border-blue-500'
-                                                        : 'bg-purple-500/20 border-purple-500'
-                                                    : 'border-[var(--fluent-border)] hover:border-[var(--fluent-blue-500)]'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-2xl">{info.icon}</span>
-                                                <span className={`fluent-badge px-2 py-1 text-sm ${poolProviders.length > 0 ? 'fluent-badge-success' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                                                    {poolProviders.length > 0 ? `${poolProviders.length} 个配置` : '未配置'}
-                                                </span>
-                                            </div>
-                                            <h3 className="text-lg font-bold text-[var(--fluent-foreground)] text-left">{info.label}</h3>
-                                            <p className="text-sm text-[var(--fluent-foreground-secondary)] text-left mt-1">{info.description}</p>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Current Pool Content */}
-                        <div className={`fluent-card p-6 border-2 ${poolInfo.color === 'blue' ? 'border-blue-500/50' : 'border-purple-500/50'}`}>
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold text-[var(--fluent-foreground)]">
-                                    {poolInfo.icon} {poolInfo.label} 模型池
-                                </h2>
-                                <button
-                                    onClick={() => handleAdd(activePoolTab)}
-                                    className={`fluent-button px-4 py-2 ${poolInfo.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'fluent-button-accent'}`}
-                                >
-                                    ➕ 添加模型
-                                </button>
-                            </div>
-
-                            {/* Edit Form */}
-                            {renderProviderForm()}
-
-                            {/* Provider List */}
-                            <div className="space-y-3">
-                                {currentPoolProviders.map(renderProviderCard)}
-
-                                {currentPoolProviders.length === 0 && !isAdding && (
-                                    <div className="text-center py-10 fluent-card border-dashed">
-                                        <div className="text-4xl mb-3">{poolInfo.icon}</div>
-                                        <p className="text-[var(--fluent-foreground-secondary)] mb-4">
-                                            尚未配置 {poolInfo.label} 模型
-                                        </p>
-                                        <button
-                                            onClick={() => handleAdd(activePoolTab)}
-                                            className={`fluent-button px-4 py-2 ${poolInfo.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'fluent-button-accent'}`}
-                                        >
-                                            ➕ 添加第一个模型
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <ModelConfigPanel />
 
                         {/* Retry Configuration */}
                         <div className="fluent-card p-5">

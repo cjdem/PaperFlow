@@ -20,12 +20,23 @@ from backend.core.llm_pool import (
 from backend.core.file_service import file_service
 from backend.core.llm_format import normalize_request_format, format_to_legacy_api_type
 from backend.core.utils import make_password_hash
+from backend.core.llm_config_service import (
+    create_model_configs,
+    delete_model_config,
+    get_provider_by_target,
+    list_model_configs,
+    set_primary_model_config,
+    toggle_model_config,
+    update_model_config,
+)
+from backend.core.translation_service import translation_service
 
 from backend.deps import get_db, get_current_admin
 from backend.core.llm_service import mark_provider_success, mark_provider_failure
 from backend.schemas import (
     DbStatsResponse, LLMProviderResponse,
     CreateLLMProviderRequest, UpdateLLMProviderRequest,
+    ModelConfigCreateRequest, ModelConfigResponse, ModelConfigUpdateRequest,
     SystemConfigRequest, UserResponse, UserQuotaRequest,
     AdminUserDetailResponse, AdminPaperDetailResponse,
     AdminGroupDetailResponse, AdminGroupPaperItem,
@@ -327,6 +338,103 @@ async def reset_user_password(
 
 
 # ================= LLM 配置 =================
+@router.get("/model-configs", response_model=list[ModelConfigResponse])
+async def get_model_configs(
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """获取统一模型配置列表"""
+    return list_model_configs(db)
+
+
+@router.post("/model-configs", response_model=list[ModelConfigResponse])
+async def create_model_config_entries(
+    request: ModelConfigCreateRequest,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """通过统一入口创建模型配置"""
+    result = create_model_configs(db, request)
+    if any(item.target in ("metadata", "analysis") for item in result):
+        trigger_reload_async()
+    return result
+
+
+@router.put("/model-configs/{target}/{provider_id}", response_model=ModelConfigResponse)
+async def update_model_config_entry(
+    target: str,
+    provider_id: int,
+    request: ModelConfigUpdateRequest,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """更新统一模型配置"""
+    result = update_model_config(db, target, provider_id, request)
+    if result.target in ("metadata", "analysis"):
+        trigger_reload_async()
+    return result
+
+
+@router.delete("/model-configs/{target}/{provider_id}")
+async def delete_model_config_entry(
+    target: str,
+    provider_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """删除统一模型配置"""
+    normalized_target = target.strip().lower()
+    delete_model_config(db, target, provider_id)
+    if normalized_target in ("metadata", "analysis"):
+        trigger_reload_async()
+    return {"message": "删除成功"}
+
+
+@router.post("/model-configs/{target}/{provider_id}/toggle")
+async def toggle_model_config_entry(
+    target: str,
+    provider_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """切换统一模型配置启用状态"""
+    normalized_target = target.strip().lower()
+    enabled = toggle_model_config(db, target, provider_id)
+    if normalized_target in ("metadata", "analysis"):
+        trigger_reload_async()
+    return {"message": "切换成功", "enabled": enabled}
+
+
+@router.post("/model-configs/{target}/{provider_id}/set-primary")
+async def set_primary_model_config_entry(
+    target: str,
+    provider_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """设置元数据/分析配置为主模型"""
+    set_primary_model_config(db, target, provider_id)
+    trigger_reload_async()
+    return {"message": "设置成功"}
+
+
+@router.post("/model-configs/{target}/{provider_id}/test")
+async def test_model_config_entry(
+    target: str,
+    provider_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """测试统一模型配置"""
+    normalized_target = target.strip().lower()
+    provider = get_provider_by_target(db, target, provider_id)
+    if normalized_target in ("metadata", "analysis"):
+        return await _test_provider_connectivity(provider)
+
+    db.expunge(provider)
+    return await translation_service.test_provider_connectivity(provider)
+
+
 @router.get("/llm-providers", response_model=list[LLMProviderResponse])
 async def get_llm_providers(
     pool_type: str = None,

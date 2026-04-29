@@ -442,3 +442,71 @@ class TranslationProviderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ModelTargetOptions(BaseModel):
+    """单个目标的附加配置"""
+    target: str
+    priority: int = 100
+    enabled: bool = True
+    weight: int = 10
+    is_primary: bool = False
+    qps: int = 4
+    pool_max_workers: Optional[int] = None
+    no_auto_extract_glossary: bool = False
+    disable_rich_text_translate: bool = False
+
+
+class ModelConfigCreateRequest(BaseModel):
+    """统一创建模型配置"""
+    name: str
+    request_format: str = "openai"
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    proxy: Optional[str] = None
+    model: str
+    targets: list[ModelTargetOptions]
+
+
+class ModelConfigUpdateRequest(BaseModel):
+    """统一更新模型配置"""
+    name: Optional[str] = None
+    request_format: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    proxy: Optional[str] = None
+    model: Optional[str] = None
+    priority: Optional[int] = None
+    enabled: Optional[bool] = None
+    weight: Optional[int] = None
+    is_primary: Optional[bool] = None
+    qps: Optional[int] = None
+    pool_max_workers: Optional[int] = None
+    no_auto_extract_glossary: Optional[bool] = None
+    disable_rich_text_translate: Optional[bool] = None
+
+
+class ModelConfigResponse(BaseModel):
+    """统一模型配置响应"""
+    id: int
+    target: str
+    name: str
+    request_format: str
+    base_url: Optional[str] = None
+    proxy: Optional[str] = None
+    model: str
+    priority: int
+    enabled: bool
+    has_api_key: bool
+    api_key: Optional[str] = None
+    weight: Optional[int] = None
+    is_primary: Optional[bool] = None
+    qps: Optional[int] = None
+    pool_max_workers: Optional[int] = None
+    no_auto_extract_glossary: Optional[bool] = None
+    disable_rich_text_translate: Optional[bool] = None
+    last_success_at: Optional[str] = None
+    last_failure_at: Optional[str] = None
+    last_error: Optional[str] = None
+    avg_latency_ms: Optional[int] = None
+    created_at: Optional[str] = None

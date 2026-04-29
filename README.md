@@ -28,8 +28,8 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
 - **👥 团队空间**：创建团队、邀请成员、共享论文
 - **🔐 多用户支持**：用户认证与权限管理
 - **🔑 账号恢复**：管理员可为忘记密码用户一键重置临时密码
-- **⚙️ LLM 配置管理**：可视化管理多个 AI 模型提供商
-  - **🛡️ 严格隔离**：元数据提取与深度分析池配置互不干扰
+- **⚙️ 统一 LLM 配置管理**：在一个入口添加模型，并分配到元数据提取、深度分析和 PDF 翻译
+  - **🛡️ 严格隔离**：元数据提取、深度分析与 PDF 翻译配置互不干扰
   - **🔄 顺序故障转移**：按优先级顺序尝试模型
   - **🔁 智能重试**：可配置单模型重试次数，死磕到底
 - **📊 存储统计**：管理员可查看各用户存储使用情况
@@ -121,7 +121,7 @@ cp llm_config.json.example llm_config.json
 }
 ```
 
-之后可在管理员面板的 "🤖 LLM 配置" 中可视化管理。
+之后可在管理员面板的 "🤖 LLM 提供商" 中可视化管理，并可把同一个模型分配到元数据提取、深度分析或 PDF 翻译。
 
 ### 6. 运行应用
 
@@ -129,6 +129,8 @@ cp llm_config.json.example llm_config.json
 ```bash
 uvicorn backend.main:app --reload
 ```
+
+> 注意：后端命令需要在项目根目录执行。不要在 `backend/` 目录下执行 `uvicorn main:app`，否则会因为项目内使用 `backend.*` 绝对导入而找不到模块。
 
 **启动前端 (Port 3000)**
 ```bash
@@ -155,6 +157,7 @@ PaperFlow/
 │   │   ├── translate.py   # PDF 翻译 API
 │   │   └── admin.py       # 管理员功能 + 存储统计 + 翻译配置
 │   ├── core/              # 后端核心模块（配置/数据库/LLM/翻译）
+│   │   └── llm_config_service.py # 统一模型配置服务
 │   ├── main.py            # 应用入口
 │   ├── schemas.py         # Pydantic 模型
 │   └── ...
@@ -162,9 +165,10 @@ PaperFlow/
 │   ├── app/               # 页面组件
 │   │   ├── papers/        # 论文列表页
 │   │   ├── workspaces/    # 团队空间页
-│   │   ├── admin/         # 管理员页（含存储统计、翻译配置）
+│   │   ├── admin/         # 管理员页（含存储统计、统一 LLM 配置、翻译队列）
 │   │   └── globals.css    # Fluent 2 设计系统样式
 │   ├── components/        # 可复用组件
+│   │   ├── admin/model-config/   # 统一模型配置组件
 │   │   ├── AdvancedSearch.tsx     # 高级搜索组件
 │   │   ├── TranslationPanel.tsx   # 翻译面板组件
 │   │   ├── TranslationMonitor.tsx # 翻译监控组件
@@ -175,7 +179,7 @@ PaperFlow/
 │   │   └── markdown/              # Markdown 渲染系统
 │   │       ├── AcademicMarkdownRenderer.tsx  # 学术 Markdown 渲染器
 │   │       └── renderers/         # 自定义渲染器（代码、数学公式等）
-│   └── lib/api.ts         # API 客户端
+│   └── lib/               # API 客户端与前端工具
 ├── runtime/
 │   ├── logs/              # 运行日志目录
 │   └── uploads/           # 文件存储目录
@@ -213,16 +217,19 @@ PaperFlow/
 - 存储占比可视化展示
 
 ### LLM 配置
-- **添加提供商**：配置 API 地址、密钥、支持的模型
+- **统一添加模型**：配置名称、请求格式、Base URL、Proxy、API Key 和模型名称
+- **分配目标**：同一个模型可分配到元数据提取、深度分析、PDF 翻译中的一个或多个目标
 - **优先级管理**：数字越小优先级越高 (1 = 最高)，系统将按优先级顺序尝试
 - **启用/禁用**：灵活控制提供商状态
+- **主模型设置**：元数据提取和深度分析支持设置主模型
+- **连接测试**：可在每个目标下测试模型连通性
 - **重试配置**：全局设置每个模型的最大重试次数
 
 ### 翻译配置
-- **翻译提供商管理**：配置 PDF 翻译使用的 LLM 提供商
+- **翻译模型管理**：在 "LLM 提供商" 页签中配置 PDF 翻译使用的模型
 - **支持多种引擎**：OpenAI、DeepSeek、Gemini、Ollama、SiliconFlow 等
 - **QPS 限制**：控制翻译请求频率
-- **翻译队列监控**：查看翻译任务状态和进度
+- **翻译队列监控**："翻译配置" 页签只展示队列状态、任务进度和工作线程控制
 
 ### 系统设置
 - **日志开关**：可开启或关闭日志记录功能
@@ -240,6 +247,8 @@ PaperFlow/
    - Build Command: `npm run build`
    - Output Directory: `.next` (Vercel 会自动识别)
    - 环境变量: `NEXT_PUBLIC_API_URL` 指向后端地址
+
+本地前端默认直接请求 `http://localhost:8000`。如果使用 Next.js rewrite 代理，可设置 `PAPERFLOW_BACKEND_URL`；生产浏览器环境建议使用 `NEXT_PUBLIC_API_URL`。
 
 ## 🛠️ 技术栈
 
@@ -261,7 +270,7 @@ PaperFlow/
 6. **文件操作** → 下载原版/中文版/双语版 PDF、预览、重新分析
 7. **批量操作** → 多选模式下批量删除、分组、导出
 8. **团队协作** → 创建团队空间、邀请成员、共享论文
-9. **系统配置** → 管理员面板配置 LLM 策略、翻译配置、查看存储统计
+9. **系统配置** → 管理员面板配置统一 LLM 策略、查看翻译队列和存储统计
 
 ## 🔍 高级搜索功能
 
@@ -320,11 +329,27 @@ FILE_STORAGE_PATH=runtime/uploads    # 文件存储根路径
 2. 等待翻译完成（可在翻译监控面板查看进度）
 3. 翻译完成后可下载中文版或双语对照版 PDF
 
-### 配置翻译提供商
-在管理员面板的 "翻译配置" 中添加翻译提供商：
+### 配置翻译模型
+在管理员面板的 "LLM 提供商" 中添加模型，并将分配目标选择为 "PDF 翻译"：
 - 选择引擎类型（OpenAI、DeepSeek、Gemini 等）
 - 配置 API 地址和密钥
 - 设置 QPS 限制（建议 2-4）
+
+## 🧪 测试与验证
+
+当前仓库使用 `test/` 保存后端服务层测试和轻量前端映射测试：
+
+```bash
+python -m pytest test/test_llm_config_service.py -q
+node --experimental-strip-types test/test_model_config_fallback.mjs
+```
+
+前端定向检查：
+
+```bash
+cd frontend
+npx eslint "components/admin/model-config/modelConfigApi.ts" "components/admin/model-config/modelConfigFallback.ts" "components/admin/model-config/ModelConfigPanel.tsx" "components/admin/model-config/ModelProviderForm.tsx" "components/admin/model-config/ModelTargetSection.tsx"
+```
 
 ## 🙏 致谢
 

@@ -123,7 +123,6 @@ uploads/
 IFLOW.md
 *.bat
 !dev.bat
-tests/
 plan/
 
 # PDFMathTranslate source code (installed via pip)
@@ -170,5 +169,9 @@ frontend/.turbo/
 # Playwright MCP artifacts
 .playwright-mcp/
 
-# Test fixtures
-test/
+# Test fixtures and generated test artifacts
+test/*.pdf
+test/**/*.pdf
+test/**/__pycache__/
+tests/**/*.pdf
+tests/**/__pycache__/
