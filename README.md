@@ -25,6 +25,11 @@ AI 驱动的学术论文管理系统，支持 PDF 自动解析、智能摘要生
   - 期刊多选筛选
 - **🏷️ 分组管理**：灵活的标签分类系统
 - **📦 批量操作**：批量删除、批量分组、批量导出（CSV/BibTeX/Markdown/JSON）
+- **📝 论文笔记/批注**：为论文添加个人笔记，支持高亮文本和页码关联
+- **📥 DOI/arXiv/BibTeX 智能导入**：通过 DOI、arXiv ID 或 BibTeX 直接导入论文元数据，无需上传 PDF
+- **⭐ 星标/收藏 + 最近查看**：快速收藏论文，NavBar 新增"收藏"和"最近查看"入口
+- **💬 AI 论文问答**：基于论文内容的 LLM 对话，支持多轮问答和对话历史
+- **📋 引用格式化**：一键生成 APA/MLA/Chicago/GB/T 7714 格式引用，支持批量引用
 - **👥 团队空间**：创建团队、邀请成员、共享论文
 - **🔐 多用户支持**：用户认证与权限管理
 - **🔑 账号恢复**：管理员可为忘记密码用户一键重置临时密码
@@ -156,7 +161,12 @@ PaperFlow/
 │   │   ├── workspaces.py  # 团队空间
 │   │   ├── export.py      # 批量导出
 │   │   ├── translate.py   # PDF 翻译 API
-│   │   └── admin.py       # 管理员功能 + 存储统计 + 翻译配置
+│   │   ├── admin.py       # 管理员功能 + 存储统计 + 翻译配置
+│   │   ├── notes.py       # 论文笔记/批注 CRUD
+│   │   ├── stars.py       # 星标/收藏 + 阅读历史
+│   │   ├── paper_import.py # DOI/arXiv/BibTeX 智能导入
+│   │   ├── paper_chat.py  # AI 论文问答 (SSE 流式)
+│   │   └── citation.py    # 引用格式化 (APA/MLA/Chicago/GB/T 7714)
 │   ├── core/              # 后端核心模块（配置/数据库/LLM/翻译）
 │   │   └── llm_config_service.py # 统一模型配置服务
 │   ├── main.py            # 应用入口

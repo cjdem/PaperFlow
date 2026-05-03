@@ -3,7 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { BookOpen, FolderOpen, Users, Settings, LogOut, Dna } from 'lucide-react';
+import { BookOpen, FolderOpen, Users, Settings, LogOut, Dna, Star, Clock } from 'lucide-react';
 import { ENTRANCE_VARIANTS } from '@/lib/animations/fluid-transitions';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
@@ -12,6 +12,8 @@ import { useAuthContext } from '@/provider/auth';
 const NAV_ITEMS = [
   { id: 'papers', icon: BookOpen, label: '论文', path: '/papers' },
   { id: 'ungrouped', icon: FolderOpen, label: '未分类', path: '/papers?view=ungrouped' },
+  { id: 'starred', icon: Star, label: '收藏', path: '/papers?view=starred' },
+  { id: 'recent', icon: Clock, label: '最近', path: '/papers?view=recent' },
   { id: 'workspaces', icon: Users, label: '空间', path: '/workspaces' },
 ];
 
@@ -25,9 +27,11 @@ export default function NavBar() {
   const isActive = (item: typeof NAV_ITEMS[number]) => {
     if (item.id === 'workspaces' && pathname.startsWith('/workspaces')) return true;
     if (pathname !== '/papers') return false;
-    const isUngrouped = searchParams.get('view') === 'ungrouped';
-    if (item.id === 'papers' && !isUngrouped) return true;
-    if (item.id === 'ungrouped' && isUngrouped) return true;
+    const viewParam = searchParams.get('view');
+    if (item.id === 'papers' && !viewParam) return true;
+    if (item.id === 'ungrouped' && viewParam === 'ungrouped') return true;
+    if (item.id === 'starred' && viewParam === 'starred') return true;
+    if (item.id === 'recent' && viewParam === 'recent') return true;
     return false;
   };
 

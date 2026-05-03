@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import Optional
 
-from backend.core.db_models import Paper, User, Group
+from backend.core.db_models import Paper, User, Group, PaperStar, ReadingHistory
 from backend.core.file_service import file_service
 
 
@@ -79,6 +79,17 @@ class PaperService:
 
         if view == "ungrouped":
             query = query.filter(~Paper.groups.any())
+        elif view == "starred":
+            starred_ids = [s.paper_id for s in self.db.query(PaperStar).filter(PaperStar.user_id == user.id).all()]
+            query = query.filter(Paper.id.in_(starred_ids)) if starred_ids else query.filter(Paper.id == -1)
+        elif view == "recent":
+            recent_ids = [
+                r.paper_id for r in self.db.query(ReadingHistory)
+                .filter(ReadingHistory.user_id == user.id)
+                .order_by(ReadingHistory.viewed_at.desc())
+                .limit(50).all()
+            ]
+            query = query.filter(Paper.id.in_(recent_ids)) if recent_ids else query.filter(Paper.id == -1)
         elif view != "all":
             query = query.filter(Paper.groups.any(name=view))
 

@@ -7,7 +7,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import auth, papers, groups, upload, admin, upload_stream, export, workspaces, translate
+from backend.routers import auth, papers, groups, upload, admin, upload_stream, export, workspaces, translate, notes, stars, paper_import, paper_chat, citation
 
 # ================= 应用配置 =================
 app = FastAPI(
@@ -33,14 +33,19 @@ app.add_middleware(
 
 # ================= 注册路由 =================
 app.include_router(auth.router)
-app.include_router(papers.router)
 app.include_router(groups.router)
+app.include_router(stars.router)
+app.include_router(papers.router)
 app.include_router(upload.router)
 app.include_router(upload_stream.router)
 app.include_router(admin.router)
 app.include_router(export.router)
 app.include_router(workspaces.router)
 app.include_router(translate.router)
+app.include_router(notes.router)
+app.include_router(paper_import.router)
+app.include_router(paper_chat.router)
+app.include_router(citation.router)
 
 
 # ================= 统一异常处理 =================

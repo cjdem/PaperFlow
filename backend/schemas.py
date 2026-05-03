@@ -58,6 +58,7 @@ class PaperResponse(BaseModel):
     original_filename: Optional[str] = None
     uploaded_at: Optional[str] = None
     has_file: bool = False  # 是否有关联文件
+    is_starred: bool = False  # 当前用户是否收藏
 
     class Config:
         from_attributes = True
@@ -484,6 +485,93 @@ class ModelConfigUpdateRequest(BaseModel):
     pool_max_workers: Optional[int] = None
     no_auto_extract_glossary: Optional[bool] = None
     disable_rich_text_translate: Optional[bool] = None
+
+
+# ================= PaperNotes（论文笔记）=================
+class CreateNoteRequest(BaseModel):
+    content: str
+    highlight_text: Optional[str] = None
+    page_number: Optional[int] = None
+
+
+class UpdateNoteRequest(BaseModel):
+    content: Optional[str] = None
+    highlight_text: Optional[str] = None
+    page_number: Optional[int] = None
+
+
+class NoteResponse(BaseModel):
+    id: int
+    paper_id: int
+    user_id: int
+    username: str
+    content: str
+    highlight_text: Optional[str] = None
+    page_number: Optional[int] = None
+    created_at: str
+    updated_at: str
+
+    class Config:
+        from_attributes = True
+
+
+# ================= ReadingHistory（阅读历史）=================
+class ReadingHistoryResponse(BaseModel):
+    paper_id: int
+    title: str
+    title_cn: Optional[str] = None
+    viewed_at: str
+
+    class Config:
+        from_attributes = True
+
+
+# ================= PaperStar（星标/收藏）=================
+class StarResponse(BaseModel):
+    paper_id: int
+    starred: bool
+
+
+# ================= PaperChat（论文问答）=================
+class ChatRequest(BaseModel):
+    question: str
+
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    role: str
+    content: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+# ================= Import（智能导入）=================
+class ImportRequest(BaseModel):
+    type: str  # doi, arxiv, bibtex
+    value: str
+
+
+class ImportResultResponse(BaseModel):
+    success: bool
+    paper_id: Optional[int] = None
+    title: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BatchImportRequest(BaseModel):
+    items: list[ImportRequest]
+
+
+# ================= Citation（引用格式化）=================
+class CitationRequest(BaseModel):
+    paper_ids: list[int]
+    style: str  # apa, mla, chicago, gbt7714
+
+
+class CitationResponse(BaseModel):
+    citations: list[str]
 
 
 class ModelConfigResponse(BaseModel):

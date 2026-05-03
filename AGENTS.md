@@ -12,6 +12,15 @@
 - 静态资源在 `frontend/public/`；运行期文件默认写入 `uploads/`。
 - 配置样例：`.env.example`、`llm_config.json.example`。
 
+## New Features (2026-05)
+- **论文笔记/批注**：`backend/routers/notes.py` + `frontend/components/NotesPanel.tsx`，支持高亮文本和页码关联。
+- **DOI/arXiv/BibTeX 智能导入**：`backend/routers/paper_import.py` + `frontend/components/ImportDialog.tsx`，通过标识符直接导入论文元数据。
+- **星标/收藏 + 最近查看**：`backend/routers/stars.py`，NavBar 新增"收藏"/"最近"导航，`PaperResponse` 含 `is_starred` 字段。
+- **AI 论文问答**：`backend/routers/paper_chat.py` + `frontend/components/ChatPanel.tsx`，基于论文内容的 LLM 对话（SSE 流式）。
+- **引用格式化**：`backend/routers/citation.py` + `frontend/components/CitationButton.tsx`，支持 APA/MLA/Chicago/GB/T 7714 四种格式。
+- 新增 ORM 模型：`PaperNote`、`ReadingHistory`、`PaperStar`、`PaperChatHistory`（在 `backend/core/db_models.py`）。
+- 路由注册顺序注意：`stars` 路由须在 `papers` 之前注册（避免 `/api/papers/starred` 被 `{paper_id}` 先匹配）。
+
 ## Build, Test, and Development Commands
 - `pip install -r requirements.txt` 安装根目录依赖（共享服务、翻译工具）。
 - `cd backend` + `pip install -r requirements.txt` 安装后端依赖。

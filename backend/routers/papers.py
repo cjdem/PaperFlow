@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from urllib.parse import quote
 
-from backend.core.db_models import Paper, User
+from backend.core.db_models import Paper, User, PaperStar
 from backend.core.file_service import file_service
 from backend.core.audit_service import log_audit_event
 from backend.core.log_service import get_logger
@@ -25,15 +25,20 @@ from backend.schemas import (
 router = APIRouter(prefix="/api/papers", tags=["论文"])
 logger = get_logger("papers")
 
-def paper_to_response(paper: Paper) -> PaperResponse:
+def paper_to_response(paper: Paper, user_id: int = None, db: Session = None) -> PaperResponse:
     """将 Paper ORM 对象转换为响应模型"""
-    # 判断是否有关联文件
     resolved_path = file_service.resolve_paper_file_path(
         relative_path=paper.file_path,
         user_id=paper.owner_id,
         md5_hash=paper.md5_hash
     )
     has_file = resolved_path is not None
+    is_starred = False
+    if user_id and db:
+        is_starred = db.query(PaperStar).filter(
+            PaperStar.user_id == user_id,
+            PaperStar.paper_id == paper.id
+        ).first() is not None
     
     return PaperResponse(
         id=paper.id,
@@ -47,12 +52,12 @@ def paper_to_response(paper: Paper) -> PaperResponse:
         detailed_analysis=paper.detailed_analysis,
         groups=[GroupInfo(id=g.id, name=g.name) for g in paper.groups],
         owner_username=paper.owner.username if paper.owner else None,
-        # 文件相关字段
         file_path=paper.file_path,
         file_size=paper.file_size,
         original_filename=paper.original_filename,
         uploaded_at=paper.uploaded_at,
-        has_file=has_file
+        has_file=has_file,
+        is_starred=is_starred
     )
 
 
@@ -77,7 +82,8 @@ async def get_papers(
     year_to: Optional[str] = Query(None, description="结束年份"),
     journals: Optional[str] = Query(None, description="期刊列表（逗号分隔）"),
     current_user: User = Depends(get_current_user),
-    paper_service: PaperService = Depends(get_paper_service)
+    paper_service: PaperService = Depends(get_paper_service),
+    db: Session = Depends(get_db)
 ):
     """获取论文列表（支持高级搜索）"""
     papers = paper_service.list_papers(
@@ -90,7 +96,7 @@ async def get_papers(
         journals=journals
     )
     return PaperListResponse(
-        papers=[paper_to_response(p) for p in papers],
+        papers=[paper_to_response(p, user_id=current_user.id, db=db) for p in papers],
         total=len(papers)
     )
 
@@ -99,13 +105,14 @@ async def get_papers(
 async def get_paper(
     paper_id: int,
     current_user: User = Depends(get_current_user),
-    paper_service: PaperService = Depends(get_paper_service)
+    paper_service: PaperService = Depends(get_paper_service),
+    db: Session = Depends(get_db)
 ):
     """获取单篇论文详情"""
     paper = paper_service.get_paper(paper_id)
     paper_service.ensure_access(paper, current_user)
     
-    return paper_to_response(paper)
+    return paper_to_response(paper, user_id=current_user.id, db=db)
 
 
 @router.delete("/{paper_id}")

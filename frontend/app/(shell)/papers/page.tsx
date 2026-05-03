@@ -8,7 +8,7 @@ import {
     uploadPapersWithProgress, Paper, Group, updatePaperGroups, UploadProgress,
     batchDeletePapers, batchUpdateGroups, batchExportPapers, downloadBlob,
     getPapersAdvanced, getFilterOptions, FilterOptions,
-    previewPaper, reanalyzePaper
+    previewPaper, reanalyzePaper, toggleStar
 } from '@/lib/api';
 import { apiClient } from '@/lib/apiClient';
 import { useAuth } from '@/lib/useAuth';
@@ -17,6 +17,10 @@ import MarkdownRenderer from '@/components/MarkdownRenderer';
 import AdvancedSearch, { SearchParams } from '@/components/AdvancedSearch';
 import TranslationPanel from '@/components/TranslationPanel';
 import AppShell from '@/components/AppShell';
+import NotesPanel from '@/components/NotesPanel';
+import ChatPanel from '@/components/ChatPanel';
+import CitationButton from '@/components/CitationButton';
+import ImportDialog from '@/components/ImportDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -30,7 +34,7 @@ import {
     Loader2, Upload, FolderOpen, FileText, ClipboardList, CheckCheck,
     Square, CheckSquare, Trash2, Inbox, Calendar, PenLine, BarChart3,
     Globe, FileDown, Eye, RefreshCw, Plus, Minus, ArrowLeftRight, X,
-    FileSpreadsheet, BookOpen, Braces
+    FileSpreadsheet, BookOpen, Braces, Star, MessageSquare, Download, StickyNote
 } from 'lucide-react';
 
 
@@ -55,7 +59,7 @@ function PapersContent() {
     const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
     const [uploadLogs, setUploadLogs] = useState<(UploadProgress & { time: string })[]>([]);
     const [expandedPaper, setExpandedPaper] = useState<number | null>(null);
-    const [detailTab, setDetailTab] = useState<'analysis' | 'abstract_cn' | 'abstract_en' | 'translate'>('analysis');
+    const [detailTab, setDetailTab] = useState<'analysis' | 'abstract_cn' | 'abstract_en' | 'translate' | 'notes' | 'chat'>('analysis');
     const [newGroupName, setNewGroupName] = useState('');
 
     const [searchParams, setSearchParams] = useState<SearchParams>({
@@ -76,6 +80,8 @@ function PapersContent() {
     const [batchSelectedGroups, setBatchSelectedGroups] = useState<Set<string>>(new Set());
     const [batchLoading, setBatchLoading] = useState(false);
     const [reanalyzingPaperId, setReanalyzingPaperId] = useState<number | null>(null);
+    const [starredPapers, setStarredPapers] = useState<Set<number>>(new Set());
+    const [showImportDialog, setShowImportDialog] = useState(false);
 
     useEffect(() => {
         const viewFromUrl = urlSearchParams.get('view') || 'all';
@@ -110,6 +116,9 @@ function PapersContent() {
             ]);
             setPapers(papersData.papers);
             setGroups(groupsData);
+            const starredIds = new Set<number>();
+            papersData.papers.forEach((p: Paper) => { if (p.is_starred) starredIds.add(p.id); });
+            setStarredPapers(starredIds);
         } catch (err) {
             console.error('加载数据失败:', err);
         }
@@ -409,6 +418,10 @@ function PapersContent() {
                 </span>
                 <input type="file" accept=".pdf" multiple onChange={handleUpload} className="hidden" disabled={uploading} />
             </label>
+            <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
+                <Download className="w-4 h-4" />
+                <span className="ml-1.5 hidden sm:inline">导入</span>
+            </Button>
         </div>
     );
 
@@ -693,6 +706,22 @@ function PapersContent() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    onClick={async () => {
+                                                        const res = await toggleStar(paper.id);
+                                                        setStarredPapers(prev => {
+                                                            const next = new Set(prev);
+                                                            res.starred ? next.add(paper.id) : next.delete(paper.id);
+                                                            return next;
+                                                        });
+                                                    }}
+                                                    title={starredPapers.has(paper.id) ? '取消收藏' : '收藏'}
+                                                >
+                                                    <Star className={cn("w-4 h-4", starredPapers.has(paper.id) && "fill-yellow-400 text-yellow-400")} />
+                                                </Button>
+                                                <CitationButton paperId={paper.id} />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() => handleDelete(paper.id)}
                                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                     title="删除"
@@ -717,7 +746,7 @@ function PapersContent() {
                                     >
                                         <div className="p-4 border-b border-border">
                                             <div className="inline-flex gap-1 border-b border-border -mb-px">
-                                                {(['analysis', 'abstract_cn', 'abstract_en', 'translate'] as const).map(tab => (
+                                                {(['analysis', 'abstract_cn', 'abstract_en', 'translate', 'notes', 'chat'] as const).map(tab => (
                                                     <button
                                                         key={tab}
                                                         onClick={() => setDetailTab(tab)}
@@ -732,6 +761,8 @@ function PapersContent() {
                                                         {tab === 'abstract_cn' && '中文摘要'}
                                                         {tab === 'abstract_en' && '英文摘要'}
                                                         {tab === 'translate' && <><Globe className="w-4 h-4 inline" /> 翻译</>}
+                                                        {tab === 'notes' && <><StickyNote className="w-4 h-4 inline" /> 笔记</>}
+                                                        {tab === 'chat' && <><MessageSquare className="w-4 h-4 inline" /> 问答</>}
                                                     </button>
                                                 ))}
                                             </div>
@@ -761,6 +792,12 @@ function PapersContent() {
                                                         embedded
                                                         onTranslationComplete={loadData}
                                                     />
+                                                )}
+                                                {detailTab === 'notes' && (
+                                                    <NotesPanel paperId={paper.id} />
+                                                )}
+                                                {detailTab === 'chat' && (
+                                                    <ChatPanel paperId={paper.id} />
                                                 )}
                                             </div>
                                         </div>
@@ -869,6 +906,7 @@ function PapersContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ImportDialog open={showImportDialog} onOpenChange={setShowImportDialog} onSuccess={loadData} />
         </AppShell>
     );
 }

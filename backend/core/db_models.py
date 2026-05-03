@@ -257,7 +257,69 @@ class AuditLog(Base):
 
     user = relationship("User")
 
-# ================= 15. 初始化 =================
+# ================= 15. PaperNote 模型（论文笔记/批注）=================
+class PaperNote(Base):
+    """论文笔记/批注"""
+    __tablename__ = 'paper_notes'
+
+    id = Column(Integer, primary_key=True)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    highlight_text = Column(Text, nullable=True)
+    page_number = Column(Integer, nullable=True)
+    created_at = Column(String(50), default=lambda: datetime.now().isoformat())
+    updated_at = Column(String(50), default=lambda: datetime.now().isoformat(), onupdate=lambda: datetime.now().isoformat())
+
+    paper = relationship("Paper")
+    user = relationship("User")
+
+# ================= 16. ReadingHistory 模型（阅读历史）=================
+class ReadingHistory(Base):
+    """阅读历史"""
+    __tablename__ = 'reading_history'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False)
+    viewed_at = Column(String(50), default=lambda: datetime.now().isoformat())
+
+    user = relationship("User")
+    paper = relationship("Paper")
+
+    __table_args__ = (UniqueConstraint('user_id', 'paper_id', name='uq_user_paper_history'),)
+
+# ================= 17. PaperStar 模型（论文星标/收藏）=================
+class PaperStar(Base):
+    """论文星标/收藏"""
+    __tablename__ = 'paper_stars'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False)
+    created_at = Column(String(50), default=lambda: datetime.now().isoformat())
+
+    user = relationship("User")
+    paper = relationship("Paper")
+
+    __table_args__ = (UniqueConstraint('user_id', 'paper_id', name='uq_user_paper_star'),)
+
+# ================= 18. PaperChatHistory 模型（论文问答历史）=================
+class PaperChatHistory(Base):
+    """论文问答历史"""
+    __tablename__ = 'paper_chat_history'
+
+    id = Column(Integer, primary_key=True)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(String(50), default=lambda: datetime.now().isoformat())
+
+    paper = relationship("Paper")
+    user = relationship("User")
+
+# ================= 初始化 =================
 DB_URL = settings.db_url
 
 
