@@ -163,6 +163,10 @@ frontend/.turbo/
 *.sqlite-wal
 *.sqlite-shm
 
+# CodeArts Doer
+.arts/
+.codeartsdoer/
+
 # oh-my-claudecode state files
 .omc/
 

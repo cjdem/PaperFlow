@@ -127,7 +127,7 @@ export default function AdminPage() {
     const handleLogout = () => { logout(); router.push('/'); };
 
     return (
-        <AppShell title="管理" userRole={user?.role} onLogout={handleLogout}>
+        <AppShell title="管理">
             {/* Tabs */}
             <div className="flex gap-1 mb-6 p-1 bg-muted rounded-2xl w-fit">
                 {TABS.map(tab => (

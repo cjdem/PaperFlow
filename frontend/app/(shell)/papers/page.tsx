@@ -413,7 +413,7 @@ function PapersContent() {
     );
 
     return (
-        <AppShell title="论文管理" userRole={user?.role} onLogout={handleLogout} toolbar={toolbar}>
+        <AppShell title="论文管理" toolbar={toolbar}>
             {/* 上传进度 */}
             <AnimatePresence>
                 {uploadProgress && (

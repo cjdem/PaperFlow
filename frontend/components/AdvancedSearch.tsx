@@ -6,9 +6,14 @@ import { Search, X, ChevronDown, Calendar, BookOpen, Info, Loader2 } from 'lucid
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+interface JournalOption {
+    name: string;
+    count: number;
+}
+
 interface FilterOptions {
     years: number[];
-    journals: string[];
+    journals: JournalOption[];
 }
 
 export interface SearchParams {
@@ -250,15 +255,15 @@ export default function AdvancedSearch({
                                     <p className="text-muted-foreground text-sm py-4">暂无期刊数据</p>
                                 ) : (
                                     <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-1">
-                                        {filterOptions?.journals.map((name) => (
+                                        {filterOptions?.journals.map((j) => (
                                             <Button
-                                                key={name}
-                                                variant={selectedJournals.includes(name) ? 'default' : 'outline'}
+                                                key={j.name}
+                                                variant={selectedJournals.includes(j.name) ? 'default' : 'outline'}
                                                 size="sm"
-                                                onClick={() => toggleJournal(name)}
+                                                onClick={() => toggleJournal(j.name)}
                                                 className="px-3 py-2 text-sm transition-all"
                                             >
-                                                {name}
+                                                {j.name}{j.count != null ? ` (${j.count})` : ''}
                                             </Button>
                                         ))}
                                     </div>

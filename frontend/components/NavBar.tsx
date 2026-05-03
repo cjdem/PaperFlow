@@ -1,17 +1,13 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { BookOpen, FolderOpen, Users, Settings, LogOut, Dna } from 'lucide-react';
 import { ENTRANCE_VARIANTS } from '@/lib/animations/fluid-transitions';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
-
-interface NavBarProps {
-  userRole?: string;
-  onLogout?: () => void;
-}
+import { useAuthContext } from '@/provider/auth';
 
 const NAV_ITEMS = [
   { id: 'papers', icon: BookOpen, label: '论文', path: '/papers' },
@@ -19,16 +15,25 @@ const NAV_ITEMS = [
   { id: 'workspaces', icon: Users, label: '空间', path: '/workspaces' },
 ];
 
-export default function NavBar({ userRole, onLogout }: NavBarProps) {
+export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
+  const { user, logout } = useAuthContext();
 
   const isActive = (item: typeof NAV_ITEMS[number]) => {
-    if (item.id === 'papers' && pathname === '/papers') return true;
     if (item.id === 'workspaces' && pathname.startsWith('/workspaces')) return true;
-    if (item.id === 'ungrouped' && pathname === '/papers') return false;
+    if (pathname !== '/papers') return false;
+    const isUngrouped = searchParams.get('view') === 'ungrouped';
+    if (item.id === 'papers' && !isUngrouped) return true;
+    if (item.id === 'ungrouped' && isUngrouped) return true;
     return false;
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push('/');
   };
 
   return (
@@ -90,7 +95,7 @@ export default function NavBar({ userRole, onLogout }: NavBarProps) {
         })}
 
         {/* Admin */}
-        {userRole === 'admin' && (
+        {user?.role === 'admin' && (
           <motion.button
             type="button"
             onClick={() => router.push('/admin')}
@@ -136,10 +141,10 @@ export default function NavBar({ userRole, onLogout }: NavBarProps) {
         </motion.button>
 
         {/* Logout */}
-        {onLogout && (
+        {user && (
           <motion.button
             type="button"
-            onClick={onLogout}
+            onClick={handleLogout}
             className="relative p-2 md:p-3 rounded-2xl z-20 text-sidebar-foreground/60 hover:bg-sidebar-accent"
             whileHover={{ scale: 1.1, zIndex: 30 }}
             whileTap={{ scale: 0.95 }}

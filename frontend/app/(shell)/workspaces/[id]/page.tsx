@@ -166,7 +166,7 @@ export default function WorkspaceDetailPage() {
     );
 
     return (
-        <AppShell title={workspace.name} userRole={user?.role} onLogout={handleLogout} toolbar={toolbar}>
+        <AppShell title={workspace.name} toolbar={toolbar}>
             {/* Workspace info */}
             {workspace.description && <p className="text-muted-foreground text-sm mb-4">{workspace.description}</p>}
             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">

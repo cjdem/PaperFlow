@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/provider/theme";
+import { AuthProvider } from "@/provider/auth";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
@@ -20,9 +21,11 @@ export default function RootLayout({
           跳转到主内容
         </a>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <main id="main-content" tabIndex={-1}>
-            {children}
-          </main>
+          <AuthProvider>
+            <main id="main-content" tabIndex={-1}>
+              {children}
+            </main>
+          </AuthProvider>
           <Toaster />
         </ThemeProvider>
       </body>

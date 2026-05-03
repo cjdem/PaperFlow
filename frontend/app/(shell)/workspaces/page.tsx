@@ -94,7 +94,7 @@ export default function WorkspacesPage() {
     );
 
     return (
-        <AppShell title="团队空间" userRole={user?.role} onLogout={handleLogout} toolbar={toolbar}>
+        <AppShell title="团队空间" toolbar={toolbar}>
             {/* Invitations */}
             {invitations.length > 0 && (
                 <div className="mb-6">
