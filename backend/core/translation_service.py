@@ -20,6 +20,34 @@ logger = get_logger("translation_service")
 _pdf2zh_openai_ua_patched = False
 
 
+@contextlib.contextmanager
+def _patch_deepl_server_url(server_url: Optional[str]):
+    """
+    临时 patch DeepLTranslator.__init__ 以支持自定义 server_url（DeepLX）。
+    pdf2zh-next 的 DeepLSettings/DeepLTranslator 不支持 server_url，
+    但底层 deepl.Translator 支持。此 patch 在 __init__ 中注入 server_url。
+    """
+    if not server_url:
+        yield
+        return
+
+    from pdf2zh_next.translator.translator_impl.deepl import DeepLTranslator
+
+    _original_init = DeepLTranslator.__init__
+
+    def _patched_init(self_tr, settings_model, rate_limiter):
+        _original_init(self_tr, settings_model, rate_limiter)
+        import deepl as _deepl
+        auth_key = settings_model.translate_engine_settings.deepl_auth_key
+        self_tr.client = _deepl.Translator(auth_key, server_url=server_url)
+
+    DeepLTranslator.__init__ = _patched_init
+    try:
+        yield
+    finally:
+        DeepLTranslator.__init__ = _original_init
+
+
 def _ensure_pdf2zh_openai_user_agent():
     """
     兼容部分 OpenAI 兼容网关的 WAF 规则：
@@ -102,7 +130,7 @@ class TranslationService:
             "deepseek", "google", "deepl", "ollama", "azure",
             "siliconflow", "zhipu", "groq", "aliyundashscope", "openaicompatible"
         }
-        use_legacy_engine = engine_type in legacy_engine_types and request_format == "openai"
+        use_legacy_engine = engine_type in legacy_engine_types
         translate_engine_settings = None
 
         # 新标准格式优先；若旧数据未配置 request_format，则保持原 engine_type 行为
@@ -305,13 +333,16 @@ class TranslationService:
             engine_type=getattr(provider, "engine_type", None),
         )
 
+        deepl_url = provider.base_url if provider.engine_type and provider.engine_type.lower() == "deepl" else None
+
         def _run_test() -> str:
             _ensure_pdf2zh_openai_user_agent()
             settings_model = self._build_settings(provider, output_dir)
             from pdf2zh_next.translator import get_translator
             with self._temporary_proxy_env(getattr(provider, "proxy", None)):
-                translator = get_translator(settings_model)
-                return translator.translate(sample_text, ignore_cache=True)
+                with _patch_deepl_server_url(deepl_url):
+                    translator = get_translator(settings_model)
+                    return translator.translate(sample_text, ignore_cache=True)
 
         result = await asyncio.to_thread(_run_test)
         latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -486,99 +517,97 @@ class TranslationService:
             
             output_paths = self.get_output_paths(pdf_path)
             
-            # 直接在主进程执行翻译：避免子进程网关拦截，同时保持输出为非调试版
-            async for event in self._translate_stream_main_process(settings, pdf_path):
-                event_type = event.get("type", "")
-                
-                if event_type == "stage_summary":
-                    yield {
-                        "type": "stage",
-                        "stage": event.get("stage", ""),
-                        "message": event.get("message", "")
-                    }
-                    self._log_to_db(
-                        "DEBUG",
-                        f"翻译阶段: {event.get('stage', '')}",
-                        task_id=task_id,
-                        paper_id=paper_id
-                    )
-                
-                elif event_type == "progress_start":
-                    yield {
-                        "type": "progress_start",
-                        "stage": event.get("stage", ""),
-                        "total": event.get("total", 0)
-                    }
-                
-                elif event_type == "progress_update":
-                    progress = event.get("progress", 0)
-                    total = event.get("total", 1)
-                    overall_progress = int((progress / total) * 100) if total > 0 else 0
+            deepl_url = provider.base_url if provider.engine_type and provider.engine_type.lower() == "deepl" else None
+            with _patch_deepl_server_url(deepl_url):
+                async for event in self._translate_stream_main_process(settings, pdf_path):
+                    event_type = event.get("type", "")
                     
-                    yield {
-                        "type": "progress",
-                        "progress": progress,
-                        "total": total,
-                        "overall_progress": overall_progress,
-                        "stage": event.get("stage", ""),
-                        "part_index": event.get("part_index", 0),
-                        "total_parts": event.get("total_parts", 1)
-                    }
-                
-                elif event_type == "progress_end":
-                    yield {
-                        "type": "progress_end",
-                        "stage": event.get("stage", "")
-                    }
-                
-                elif event_type == "finish":
-                    # 翻译完成
-                    mono_path = event.get("translate_path", output_paths["mono_path"])
-                    dual_path = event.get("translate_dual_path", output_paths["dual_path"])
+                    if event_type == "stage_summary":
+                        yield {
+                            "type": "stage",
+                            "stage": event.get("stage", ""),
+                            "message": event.get("message", "")
+                        }
+                        self._log_to_db(
+                            "DEBUG",
+                            f"翻译阶段: {event.get('stage', '')}",
+                            task_id=task_id,
+                            paper_id=paper_id
+                        )
                     
-                    # 删除词汇表文件
-                    self.cleanup_glossary_file(pdf_path)
+                    elif event_type == "progress_start":
+                        yield {
+                            "type": "progress_start",
+                            "stage": event.get("stage", ""),
+                            "total": event.get("total", 0)
+                        }
                     
-                    # 更新论文记录
-                    paper.translation_status = "completed"
-                    paper.translation_progress = 100
-                    paper.translated_file_path = mono_path
-                    paper.translated_dual_path = dual_path
-                    paper.translated_at = datetime.now().isoformat()
-                    paper.translation_error = None
-                    session.commit()
+                    elif event_type == "progress_update":
+                        progress = event.get("progress", 0)
+                        total = event.get("total", 1)
+                        overall_progress = int((progress / total) * 100) if total > 0 else 0
+                        
+                        yield {
+                            "type": "progress",
+                            "progress": progress,
+                            "total": total,
+                            "overall_progress": overall_progress,
+                            "stage": event.get("stage", ""),
+                            "part_index": event.get("part_index", 0),
+                            "total_parts": event.get("total_parts", 1)
+                        }
                     
-                    self._log_to_db(
-                        "INFO",
-                        f"翻译完成: {paper.title or paper_id}",
-                        task_id=task_id,
-                        paper_id=paper_id,
-                        details={"mono_path": mono_path, "dual_path": dual_path}
-                    )
-                    logger.info(f"[task_{task_id}] 翻译完成: {paper_id}")
+                    elif event_type == "progress_end":
+                        yield {
+                            "type": "progress_end",
+                            "stage": event.get("stage", "")
+                        }
                     
-                    yield {
-                        "type": "finish",
-                        "mono_path": mono_path,
-                        "dual_path": dual_path
-                    }
-                
-                elif event_type == "error":
-                    error_msg = event.get("error", "翻译失败")
+                    elif event_type == "finish":
+                        mono_path = event.get("translate_path", output_paths["mono_path"])
+                        dual_path = event.get("translate_dual_path", output_paths["dual_path"])
+                        
+                        self.cleanup_glossary_file(pdf_path)
+                        
+                        paper.translation_status = "completed"
+                        paper.translation_progress = 100
+                        paper.translated_file_path = mono_path
+                        paper.translated_dual_path = dual_path
+                        paper.translated_at = datetime.now().isoformat()
+                        paper.translation_error = None
+                        session.commit()
+                        
+                        self._log_to_db(
+                            "INFO",
+                            f"翻译完成: {paper.title or paper_id}",
+                            task_id=task_id,
+                            paper_id=paper_id,
+                            details={"mono_path": mono_path, "dual_path": dual_path}
+                        )
+                        logger.info(f"[task_{task_id}] 翻译完成: {paper_id}")
+                        
+                        yield {
+                            "type": "finish",
+                            "mono_path": mono_path,
+                            "dual_path": dual_path
+                        }
                     
-                    paper.translation_status = "failed"
-                    paper.translation_error = error_msg
-                    session.commit()
-                    
-                    self._log_to_db(
-                        "ERROR",
-                        f"翻译失败: {error_msg}",
-                        task_id=task_id,
-                        paper_id=paper_id
-                    )
-                    logger.error(f"[task_{task_id}] 翻译失败: {paper_id}, 错误: {error_msg}")
-                    
-                    yield {"type": "error", "error": error_msg}
+                    elif event_type == "error":
+                        error_msg = event.get("error", "翻译失败")
+                        
+                        paper.translation_status = "failed"
+                        paper.translation_error = error_msg
+                        session.commit()
+                        
+                        self._log_to_db(
+                            "ERROR",
+                            f"翻译失败: {error_msg}",
+                            task_id=task_id,
+                            paper_id=paper_id
+                        )
+                        logger.error(f"[task_{task_id}] 翻译失败: {paper_id}, 错误: {error_msg}")
+                        
+                        yield {"type": "error", "error": error_msg}
         
         except Exception as e:
             import traceback

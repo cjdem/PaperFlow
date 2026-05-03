@@ -12,6 +12,7 @@ from backend.core.llm_format import (
     format_to_legacy_api_type,
     normalize_request_format,
     normalize_translation_request_format,
+    TRANSLATION_ENGINE_TYPES,
 )
 from backend.schemas import (
     ModelConfigCreateRequest,
@@ -34,9 +35,9 @@ def validate_target(target: str) -> str:
     return normalized
 
 
-def pick_model(value: str | None) -> str:
+def pick_model(value: str | None, *, allow_empty: bool = False) -> str:
     model = (value or "").strip()
-    if not model:
+    if not model and not allow_empty:
         raise HTTPException(status_code=400, detail="模型名称不能为空")
     return model
 
@@ -128,7 +129,9 @@ def create_model_configs(
     db: Session,
     request: ModelConfigCreateRequest,
 ) -> list[ModelConfigResponse]:
-    model = pick_model(request.model)
+    norm_format = normalize_translation_request_format(request.request_format)
+    allow_empty_model = norm_format in TRANSLATION_ENGINE_TYPES
+    model = pick_model(request.model, allow_empty=allow_empty_model)
     if not request.targets:
         raise HTTPException(status_code=400, detail="至少选择一个分配目标")
 
@@ -289,7 +292,7 @@ def _update_translation_config(
     if request.proxy is not None:
         provider.proxy = request.proxy
     if request.model is not None:
-        provider.model = pick_model(request.model)
+        provider.model = pick_model(request.model, allow_empty=True)
     if request.request_format is not None:
         provider.request_format = normalize_translation_request_format(request.request_format)
         provider.engine_type = provider.request_format

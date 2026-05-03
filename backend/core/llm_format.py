@@ -17,6 +17,11 @@ SUPPORTED_REQUEST_FORMATS = {
     REQUEST_FORMAT_ANTHROPIC,
 }
 
+TRANSLATION_ENGINE_TYPES = {
+    "deepseek", "google", "deepl", "ollama", "azure",
+    "siliconflow", "zhipu", "groq", "aliyundashscope", "openaicompatible",
+}
+
 
 def normalize_request_format(
     request_format: str | None = None,
@@ -43,13 +48,18 @@ def normalize_translation_request_format(
 ) -> str:
     """
     统一翻译链路请求格式。旧字段 engine_type 作为兼容兜底。
+    翻译专用引擎类型（deepl/google/ollama 等）直接保留原值。
     """
     value = (request_format or "").strip().lower()
     if value in SUPPORTED_REQUEST_FORMATS:
         return value
+    if value in TRANSLATION_ENGINE_TYPES:
+        return value
 
     legacy = (engine_type or "").strip().lower()
     if legacy in (REQUEST_FORMAT_GEMINI, REQUEST_FORMAT_ANTHROPIC, REQUEST_FORMAT_OPENAI_RESPONSE):
+        return legacy
+    if legacy in TRANSLATION_ENGINE_TYPES:
         return legacy
     return REQUEST_FORMAT_OPENAI
 

@@ -6,10 +6,14 @@ import type { ModelConfig, ModelConfigFormData, ModelTarget, ModelTargetOptions 
 import { MODEL_TARGET_DESCRIPTIONS, MODEL_TARGET_LABELS, MODEL_TARGETS } from './types';
 
 const REQUEST_FORMATS = [
-  { value: 'openai', label: 'OpenAI Chat Completions', hint: 'https://api.openai.com/v1 或兼容网关' },
-  { value: 'openai_response', label: 'OpenAI Responses', hint: 'https://api.openai.com/v1' },
-  { value: 'gemini', label: 'Google Gemini', hint: 'https://generativelanguage.googleapis.com/v1beta' },
-  { value: 'anthropic', label: 'Anthropic Claude', hint: 'https://api.anthropic.com' },
+  { value: 'openai', label: 'OpenAI Chat Completions', hint: 'https://api.openai.com/v1 或兼容网关', needsModel: true },
+  { value: 'openai_response', label: 'OpenAI Responses', hint: 'https://api.openai.com/v1', needsModel: true },
+  { value: 'gemini', label: 'Google Gemini', hint: 'https://generativelanguage.googleapis.com/v1beta', needsModel: true },
+  { value: 'anthropic', label: 'Anthropic Claude', hint: 'https://api.anthropic.com', needsModel: true },
+  { value: 'deepl', label: 'DeepL / DeepLX', hint: 'https://api-free.deepl.com/v2 或 DeepLX 地址', needsModel: false },
+  { value: 'google', label: 'Google Translate', hint: '（无需 Base URL）', needsModel: false },
+  { value: 'ollama', label: 'Ollama', hint: 'http://localhost:11434', needsModel: true },
+  { value: 'deepseek', label: 'DeepSeek', hint: '（使用官方 API）', needsModel: true },
 ];
 
 export const createTargetOptions = (target: ModelTarget): ModelTargetOptions => ({
@@ -64,7 +68,7 @@ export function ModelProviderForm({
 
   const canSubmit =
     value.name.trim().length > 0 &&
-    value.model.trim().length > 0 &&
+    (selectedFormat.needsModel === false || value.model.trim().length > 0) &&
     value.targets.length > 0 &&
     saveStatus !== 'saving';
 
@@ -98,7 +102,15 @@ export function ModelProviderForm({
           <select
             className="border rounded-md bg-transparent px-3 py-2 text-sm w-full"
             value={value.request_format}
-            onChange={event => onChange({ ...value, request_format: event.target.value })}
+            onChange={event => {
+              const newFormat = event.target.value;
+              const formatObj = REQUEST_FORMATS.find(f => f.value === newFormat);
+              let newTargets = value.targets;
+              if (formatObj && !formatObj.needsModel && !value.targets.some(t => t.target === 'translation')) {
+                newTargets = [...value.targets, createTargetOptions('translation')];
+              }
+              onChange({ ...value, request_format: newFormat, targets: newTargets });
+            }}
           >
             {REQUEST_FORMATS.map(item => (
               <option key={item.value} value={item.value}>
@@ -129,17 +141,19 @@ export function ModelProviderForm({
             type="password"
             value={value.api_key}
             onChange={event => onChange({ ...value, api_key: event.target.value })}
-            placeholder={isEditing ? '留空表示不修改' : 'sk-...'}
+            placeholder={isEditing ? '留空表示不修改' : value.request_format === 'deepl' ? 'DeepL Auth Key' : 'sk-...'}
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">模型名称</label>
-          <Input
-            value={value.model}
-            onChange={event => onChange({ ...value, model: event.target.value })}
-            placeholder="gpt-4o-mini"
-          />
-        </div>
+        {selectedFormat.needsModel !== false && (
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">模型名称</label>
+            <Input
+              value={value.model}
+              onChange={event => onChange({ ...value, model: event.target.value })}
+              placeholder="gpt-4o-mini"
+            />
+          </div>
+        )}
       </div>
 
       {/* 目标分配区域（仅新增时显示） */}
